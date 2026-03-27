@@ -1,0 +1,543 @@
+{% extends 'base.html' %}
+{% block title %}التركيبات - Top Net{% endblock %}
+
+{% block content %}
+{% include 'navbar.html' %}
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" dir="rtl">
+    <h1 class="text-2xl font-bold text-white mb-2 flex items-center gap-3">
+        <i class="fa-solid fa-screwdriver-wrench text-blue-400"></i>
+        نظام إدارة التركيبات
+    </h1>
+    <p class="text-slate-400 text-sm mb-6">تسجيل ومتابعة طلبات التركيب من الطلب حتى التسليم والدفع</p>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <div class="glass-panel rounded-xl p-4 text-center border border-slate-700">
+            <div class="text-2xl font-bold text-white">{{ stats.total }}</div>
+            <div class="text-xs text-slate-400 mt-1">إجمالي الطلبات</div>
+        </div>
+        <div class="glass-panel rounded-xl p-4 text-center border border-amber-500/20">
+            <div class="text-2xl font-bold text-amber-400">{{ stats.pending }}</div>
+            <div class="text-xs text-slate-400 mt-1">معلّق</div>
+        </div>
+        <div class="glass-panel rounded-xl p-4 text-center border border-blue-500/20">
+            <div class="text-2xl font-bold text-blue-400">{{ stats.assigned }}</div>
+            <div class="text-xs text-slate-400 mt-1">قيد التنفيذ</div>
+        </div>
+        <div class="glass-panel rounded-xl p-4 text-center border border-emerald-500/20">
+            <div class="text-2xl font-bold text-emerald-400">{{ stats.completed }}</div>
+            <div class="text-xs text-slate-400 mt-1">مكتمل</div>
+        </div>
+        {% if session.get('role') in ['admin', 'manager'] %}
+        <div class="glass-panel rounded-xl p-4 text-center border border-purple-500/20">
+            <div class="text-lg font-bold text-emerald-400">{{ "%.2f"|format(stats.total_revenue_usd) }} $</div>
+            <div class="text-lg font-bold text-purple-400">{{ "%.0f"|format(stats.total_revenue_syp) }} ل.س</div>
+            <div class="text-[10px] text-slate-400 mt-1">إجمالي الإيرادات</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="mb-4 p-4 rounded-lg flex items-center {% if category == 'success' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% else %}bg-red-500/10 text-red-400 border border-red-500/20{% endif %}">
+            <i class="fa-solid {% if category == 'success' %}fa-check-circle{% else %}fa-circle-exclamation{% endif %} mr-3"></i>
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Add Complaint Form (Admin/Manager/Employee) -->
+        {% if session.get('role') in ['admin', 'manager', 'employee'] %}
+        <div class="lg:col-span-1">
+            <div class="glass-panel shadow-xl rounded-xl p-6 sticky top-24">
+                <h3 class="text-lg font-bold mb-5 border-b border-white/5 pb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-plus-circle text-blue-400"></i>
+                    تسجيل طلب تركيب جديد
+                </h3>
+                <form method="POST" action="{{ url_for('installations') }}">
+                    <input type="hidden" name="action" value="add">
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">الاسم الكامل *</label>
+                            <input type="text" name="fullname" required placeholder="اسم العميل الكامل"
+                                class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">الهاتف الرئيسي *</label>
+                                <input type="text" name="phone1" required placeholder="09xxxxxxxx"
+                                    class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">هاتف بديل</label>
+                                <input type="text" name="phone2" placeholder="اختياري"
+                                    class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">المنطقة</label>
+                            <input type="text" name="area" placeholder="اسم المنطقة"
+                                class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">تفاصيل العنوان</label>
+                            <input type="text" name="address_details" placeholder="الحي / الشارع / رقم البناء..."
+                                class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">ملاحظات</label>
+                            <textarea name="notes" rows="2" placeholder="أي ملاحظات إضافية..."
+                                class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors resize-none"></textarea>
+                        </div>
+                        <button type="submit"
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                            <i class="fa-solid fa-plus"></i>
+                            تسجيل طلب التركيب
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Installations Table -->
+        <div class="{% if session.get('role') in ['admin', 'manager', 'employee'] %}lg:col-span-2{% else %}col-span-full{% endif %}">
+            
+            <!-- Filter + Export bar -->
+            <div class="flex flex-wrap gap-4 items-end justify-between mb-6">
+                <form method="GET" class="flex flex-wrap gap-3 items-end">
+                    <div>
+                        <label class="block text-[10px] text-slate-500 mb-1 mr-1">الحالة</label>
+                        <select name="status" onchange="this.form.submit()"
+                            class="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 min-w-[120px]">
+                            <option value="">جميع الحالات</option>
+                            <option value="Pending" {% if request.args.get('status') == 'Pending' %}selected{% endif %}>معلّق</option>
+                            <option value="Assigned" {% if request.args.get('status') == 'Assigned' %}selected{% endif %}>قيد التنفيذ</option>
+                            <option value="Completed" {% if request.args.get('status') == 'Completed' %}selected{% endif %}>مكتمل</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 mb-1 mr-1">من تاريخ</label>
+                        <input type="date" name="start_date" value="{{ request.args.get('start_date', '') }}" onchange="this.form.submit()"
+                            class="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 mb-1 mr-1">إلى تاريخ</label>
+                        <input type="date" name="end_date" value="{{ request.args.get('end_date', '') }}" onchange="this.form.submit()"
+                            class="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    {% if request.args.get('status') or request.args.get('start_date') or request.args.get('end_date') %}
+                    <a href="{{ url_for('installations') }}" 
+                       class="text-xs text-blue-400 hover:text-blue-300 mb-2.5 transition-colors">
+                        <i class="fa-solid fa-xmark mr-1"></i> مسح الفلاتر
+                    </a>
+                    {% endif %}
+                </form>
+                {% if session.get('role') in ['admin', 'manager'] %}
+                <a href="{{ url_for('export_installations') }}"
+                    class="flex items-center gap-2 px-4 py-2 bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 rounded-lg hover:bg-emerald-600/30 transition-colors text-sm">
+                    <i class="fa-solid fa-file-excel"></i>
+                    تصدير Excel
+                </a>
+                {% endif %}
+            </div>
+
+            <!-- Table -->
+            <div class="glass-panel rounded-xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[640px]">
+                        <thead class="bg-slate-800/80">
+                            <tr>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">#</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">العميل</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase hidden sm:table-cell">المنطقة</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase text-center">الحالة</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase hidden lg:table-cell">المكلف</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase hidden md:table-cell">تفاصيل فنية</th>
+                                {% if session.get('role') in ['admin', 'manager'] %}
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase hidden md:table-cell">الدفعة</th>
+                                {% endif %}
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase hidden md:table-cell">التاريخ</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/30">
+                            {% for inst in installations %}
+                            <tr class="hover:bg-slate-800/40 transition-colors">
+                                <td class="px-4 py-3 text-slate-500 text-sm font-mono">#{{ inst.id }}</td>
+                                <td class="px-4 py-3">
+                                    <div class="text-sm font-semibold text-white">{{ inst.fullname }}</div>
+                                    <div class="flex flex-wrap gap-2 mt-1">
+                                        <a href="tel:{{ inst.phone1 }}" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+                                            <i class="fa-solid fa-phone"></i> {{ inst.phone1 }}
+                                        </a>
+                                        {% if inst.phone2 %}
+                                        <a href="tel:{{ inst.phone2 }}" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors border-r border-slate-700 pr-2">
+                                             {{ inst.phone2 }}
+                                        </a>
+                                        {% endif %}
+                                        <a href="https://wa.me/{{ inst.phone1.replace(' ', '') }}" target="_blank" class="text-xs text-emerald-500 hover:text-emerald-400 flex items-center gap-1 transition-colors">
+                                            <i class="fa-brands fa-whatsapp"></i>
+                                        </a>
+                                    </div>
+                                    {% if inst.notes %}
+                                    <div class="text-xs text-slate-500 mt-1.5 italic">{{ inst.notes[:50] }}{% if inst.notes|length > 50 %}...{% endif %}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 hidden sm:table-cell">
+                                    {% if inst.area %}
+                                    <span class="text-xs bg-slate-700/50 text-slate-300 px-2 py-0.5 rounded-full">{{ inst.area }}</span>
+                                    {% endif %}
+                                    {% if inst.address_details %}
+                                    <div class="text-xs text-slate-500 mt-1">{{ inst.address_details[:40] }}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    {% if inst.status == 'Pending' %}
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20" title="معلّق">⏳</span>
+                                    {% elif inst.status == 'Assigned' %}
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20" title="قيد التنفيذ">🔧</span>
+                                    {% elif inst.status == 'Cancelled' %}
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/20" title="ملغي">❌</span>
+                                    {% else %}
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" title="مكتمل">✅</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 text-sm text-slate-300 hidden lg:table-cell">
+                                    {{ inst.assigned_to or '—' }}
+                                </td>
+                                <td class="px-4 py-3 text-sm hidden md:table-cell">
+                                    {% if inst.connection_type %}
+                                        <div class="flex items-center gap-1.5 text-slate-300">
+                                            <i class="fa-solid {% if inst.connection_type == 'Dish' %}fa-satellite-dish text-blue-400{% else %}fa-box text-amber-400{% endif %}"></i>
+                                            <span>{{ 'صحن' if inst.connection_type == 'Dish' else 'علبة' }}</span>
+                                        </div>
+                                    {% else %}
+                                        <span class="text-slate-600">—</span>
+                                    {% endif %}
+                                </td>
+                                {% if session.get('role') in ['admin', 'manager'] %}
+                                <td class="px-4 py-3 text-sm hidden md:table-cell">
+                                    {% if inst.payment_amount_usd or inst.payment_amount_syp %}
+                                    <div class="space-y-0.5">
+                                        {% if inst.payment_amount_usd %}
+                                        <div class="text-emerald-400 font-bold text-xs">{{ "%.2f"|format(inst.payment_amount_usd) }} $</div>
+                                        {% endif %}
+                                        {% if inst.payment_amount_syp %}
+                                        <div class="text-purple-400 font-bold text-xs">{{ "%.0f"|format(inst.payment_amount_syp) }} ل.س</div>
+                                        {% endif %}
+                                    </div>
+                                    {% else %}
+                                    <span class="text-slate-600">—</span>
+                                    {% endif %}
+                                </td>
+                                {% endif %}
+                                <td class="px-4 py-3 text-xs text-slate-500 hidden md:table-cell font-mono">
+                                    {{ inst.created_at[:16] if inst.created_at else '—' }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex flex-wrap gap-2">
+                                        {% if inst.status == 'Pending' %}
+                                            {% if session.get('role') == 'maintenance' %}
+                                            <!-- Assign button for maintenance -->
+                                            <form method="POST" action="{{ url_for('installations') }}">
+                                                <input type="hidden" name="action" value="assign">
+                                                <input type="hidden" name="inst_id" value="{{ inst.id }}">
+                                                <button type="submit"
+                                                    class="px-3 py-1.5 bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-lg hover:bg-blue-600/30 transition-colors text-xs font-medium">
+                                                    <i class="fa-solid fa-hand-pointer ml-1"></i>
+                                                    استلام
+                                                </button>
+                                            </form>
+                                            {% elif session.get('role') in ['admin', 'manager'] %}
+                                            <!-- Assign button for Admin/Manager -->
+                                            <button onclick="openAssignModal({{ inst.id }})"
+                                                class="px-3 py-1.5 bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 rounded-lg hover:bg-indigo-600/30 transition-colors text-xs font-medium">
+                                                <i class="fa-solid fa-user-plus ml-1"></i>
+                                                إحالة
+                                            </button>
+                                            {% endif %}
+                                        {% elif inst.status == 'Assigned' and (session.get('role') in ['admin','manager'] or inst.assigned_to == session.get('username')) %}
+                                        <!-- Complete button -->
+                                        <button onclick="openCompleteModal({{ inst.id }})"
+                                            class="px-3 py-1.5 bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 rounded-lg hover:bg-emerald-600/30 transition-colors text-xs font-medium">
+                                            <i class="fa-solid fa-check-double ml-1"></i>
+                                            انهاء
+                                        </button>
+                                        {% endif %}
+
+                                        {% if inst.status in ['Pending', 'Assigned'] and session.get('role') in ['admin', 'manager', 'employee'] %}
+                                        <!-- Cancel button -->
+                                        <form method="POST" action="{{ url_for('installations') }}" onsubmit="return confirm('هل أنت متأكد من إلغاء هذا الطلب؟')">
+                                            <input type="hidden" name="action" value="cancel">
+                                            <input type="hidden" name="inst_id" value="{{ inst.id }}">
+                                            <button type="submit"
+                                                class="px-3 py-1.5 bg-red-600/10 text-red-500 border border-red-500/20 rounded-lg hover:bg-red-600/20 transition-colors text-xs font-medium" title="إلغاء التركيب">
+                                                <i class="fa-solid fa-ban"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+
+                                        {% if session.get('role') in ['admin', 'manager'] %}
+                                        <!-- Edit button -->
+                                        <button data-inst='{{ inst|tojson|safe }}' onclick="openEditModal(JSON.parse(this.getAttribute('data-inst')))"
+                                            class="px-3 py-1.5 bg-slate-700/50 text-slate-300 border border-slate-600 rounded-lg hover:bg-slate-700 transition-colors text-xs font-medium" title="تعديل">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </button>
+                                        <!-- Delete button -->
+                                        <form method="POST" action="{{ url_for('installations') }}" onsubmit="return confirm('⚠️ تحذير: سيتم حذف الطلب نهائياً. هل أنت متأكد؟')">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="inst_id" value="{{ inst.id }}">
+                                            <button type="submit"
+                                                class="px-3 py-1.5 bg-rose-900/20 text-rose-500 border border-rose-500/30 rounded-lg hover:bg-rose-900/30 transition-colors text-xs font-medium" title="حذف نهائي">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+
+                                        {% if inst.status == 'Completed' %}
+                                        <span class="text-xs text-slate-600 self-center">مكتمل</span>
+                                        {% elif inst.status == 'Cancelled' %}
+                                        <span class="text-xs text-rose-800 self-center">ملغي</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="10" class="text-center py-12 text-slate-500">
+                                    <i class="fa-solid fa-inbox text-3xl mb-3 block text-slate-600"></i>
+                                    لا توجد طلبات تركيب حالياً
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assign Modal -->
+<div id="assign-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="glass-panel rounded-2xl p-6 w-full max-w-sm border border-indigo-500/20 shadow-2xl" dir="rtl">
+        <h3 class="text-lg font-bold text-white mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-user-plus text-indigo-400"></i>
+            إحالة طلب التركيب
+        </h3>
+        <p class="text-sm text-slate-400 mb-5">اختر موظف الصيانة لتسليمه مهمة التركيب.</p>
+        <form method="POST" action="{{ url_for('installations') }}" id="assign-form">
+            <input type="hidden" name="action" value="assign">
+            <input type="hidden" name="inst_id" id="assign-inst-id">
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">الموظف المكلف</label>
+                    <select name="assigned_to" required
+                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors">
+                        <option value="">اختر موظف...</option>
+                        {% for emp in maintenance_users %}
+                        <option value="{{ emp.username }}">{{ emp.username }} {% if emp.maintenance_id %}(M-ID: {{ emp.maintenance_id }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex gap-3 pt-1">
+                    <button type="submit"
+                        class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                        <i class="fa-solid fa-check"></i>
+                        تأكيد الإحالة
+                    </button>
+                    <button type="button" onclick="closeAssignModal()"
+                        class="px-6 bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium py-2.5 rounded-lg transition-colors">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Complete Modal -->
+<div id="complete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="glass-panel rounded-2xl p-6 w-full max-w-md border border-emerald-500/20 shadow-2xl" dir="rtl">
+        <h3 class="text-lg font-bold text-white mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-receipt text-emerald-400"></i>
+            انهاء التركيب وتسجيل الدفعة
+        </h3>
+        <p class="text-sm text-slate-400 mb-5">أدخل مبلغ الفاتورة وأي ملاحظات قبل إغلاق الطلب</p>
+        <form method="POST" action="{{ url_for('installations') }}" id="complete-form">
+            <input type="hidden" name="action" value="complete">
+            <input type="hidden" name="inst_id" id="complete-inst-id">
+
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">نوع الاتصال</label>
+                        <select name="connection_type" id="conn-type-select" onchange="toggleIpField()"
+                            class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors">
+                            <option value="">اختر النوع...</option>
+                            <option value="Dish">صحن (Dish)</option>
+                            <option value="Box">علبة (Box)</option>
+                        </select>
+                    </div>
+                    <div id="ip-field-container" class="hidden">
+                        <label class="block text-xs text-slate-400 mb-1">IP الصحن</label>
+                        <input type="text" name="dish_ip" placeholder="192.168.1.x"
+                            class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">المبلغ بالدولار ($)</label>
+                        <input type="number" name="payment_amount_usd" min="0" step="0.01" placeholder="مثال: 50"
+                            class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">المبلغ بالليرة (ل.س)</label>
+                        <input type="number" name="payment_amount_syp" min="0" step="500" placeholder="مثال: 50000"
+                            class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">ملاحظات الفاتورة</label>
+                    <textarea name="payment_notes" rows="3" placeholder="تفاصيل عن الدفعة أو العمل المنجز..."
+                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors resize-none"></textarea>
+                </div>
+                <div class="flex gap-3 pt-1">
+                    <button type="submit"
+                        class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                        <i class="fa-solid fa-check"></i>
+                        تأكيد الانتهاء
+                    </button>
+                    <button type="button" onclick="closeCompleteModal()"
+                        class="px-6 bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium py-2.5 rounded-lg transition-colors">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="glass-panel rounded-2xl p-6 w-full max-w-md border border-blue-500/20 shadow-2xl" dir="rtl">
+        <h3 class="text-lg font-bold text-white mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-pen-to-square text-blue-400"></i>
+            تعديل بيانات طلب التركيب
+        </h3>
+        <p class="text-sm text-slate-400 mb-5">تحديث المعلومات الأساسية للطلب</p>
+        <form method="POST" action="{{ url_for('installations') }}" id="edit-form">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="inst_id" id="edit-inst-id">
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">الاسم الكامل *</label>
+                    <input type="text" name="fullname" id="edit-fullname" required
+                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">الهاتف الرئيسي *</label>
+                        <input type="text" name="phone1" id="edit-phone1" required
+                            class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">هاتف بديل</label>
+                        <input type="text" name="phone2" id="edit-phone2"
+                            class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">المنطقة</label>
+                    <input type="text" name="area" id="edit-area"
+                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">تفاصيل العنوان</label>
+                    <input type="text" name="address_details" id="edit-address"
+                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">ملاحظات</label>
+                    <textarea name="notes" id="edit-notes" rows="2"
+                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors resize-none"></textarea>
+                </div>
+                <div class="flex gap-3 pt-1">
+                    <button type="submit"
+                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors">
+                        حفظ التغييرات
+                    </button>
+                    <button type="button" onclick="closeEditModal()"
+                        class="px-6 bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium py-2.5 rounded-lg transition-colors">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openCompleteModal(instId) {
+    document.getElementById('complete-inst-id').value = instId;
+    document.getElementById('complete-modal').classList.remove('hidden');
+}
+function closeCompleteModal() {
+    document.getElementById('complete-modal').classList.add('hidden');
+}
+
+function openEditModal(inst) {
+    document.getElementById('edit-inst-id').value = inst.id;
+    document.getElementById('edit-fullname').value = inst.fullname || '';
+    document.getElementById('edit-phone1').value = inst.phone1 || '';
+    document.getElementById('edit-phone2').value = inst.phone2 || '';
+    document.getElementById('edit-area').value = inst.area || '';
+    document.getElementById('edit-address').value = inst.address_details || '';
+    document.getElementById('edit-notes').value = inst.notes || '';
+    document.getElementById('edit-modal').classList.remove('hidden');
+}
+function closeEditModal() {
+    document.getElementById('edit-modal').classList.add('hidden');
+}
+
+function toggleIpField() {
+    const typeSelect = document.getElementById('conn-type-select');
+    const ipContainer = document.getElementById('ip-field-container');
+    if (typeSelect.value === 'Dish') {
+        ipContainer.classList.remove('hidden');
+    } else {
+        ipContainer.classList.add('hidden');
+    }
+}
+function openAssignModal(instId) {
+    document.getElementById('assign-inst-id').value = instId;
+    document.getElementById('assign-modal').classList.remove('hidden');
+}
+function closeAssignModal() {
+    document.getElementById('assign-modal').classList.add('hidden');
+}
+
+// Close modals on backdrop click
+document.querySelectorAll('#complete-modal, #edit-modal, #assign-modal').forEach(modal => {
+    modal.addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeCompleteModal();
+            closeEditModal();
+            closeAssignModal();
+        }
+    });
+});
+</script>
+{% endblock %}

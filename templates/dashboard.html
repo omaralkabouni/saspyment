@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Top Net Pay{% endblock %}
+
+{% block content %}
+{% include 'navbar.html' %}
+
+<!-- Main container -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-8">
+
+    <!-- Header & Stats -->
+    <div class="mb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-white mb-2">Users Directory</h1>
+                <div class="flex items-center space-x-2 text-slate-400 text-sm">
+                    <span>Manage and monitor all radius users and distributors.</span>
+                    <span class="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] border border-slate-700 font-medium">
+                        <i class="fa-solid fa-clock mr-1"></i> {{ last_update_str }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <!-- Total Panel -->
+            <div class="glass-panel px-6 py-4 rounded-xl flex items-center space-x-4 border-l-4 border-primary">
+                <div class="p-3 bg-primary/20 text-primary rounded-lg">
+                    <i class="fa-solid fa-users text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Users</p>
+                    <p class="text-2xl font-bold text-white">{{ total }}</p>
+                </div>
+            </div>
+
+            <!-- Active Panel -->
+            <div class="glass-panel px-6 py-4 rounded-xl flex items-center space-x-4 border-l-4 border-emerald-500">
+                <div class="p-3 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                    <i class="fa-solid fa-user-check text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Active Users (Filtered)</p>
+                    <p class="text-2xl font-bold text-emerald-400">{{ active_count }}</p>
+                </div>
+            </div>
+
+            <!-- Inactive Panel -->
+            <div class="glass-panel px-6 py-4 rounded-xl flex items-center space-x-4 border-l-4 border-red-500">
+                <div class="p-3 bg-red-500/20 text-red-400 rounded-lg">
+                    <i class="fa-solid fa-user-xmark text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Inactive Users (Filtered)</p>
+                    <p class="text-2xl font-bold text-red-400">{{ inactive_count }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls Layer -->
+    <div class="glass-panel rounded-xl mb-6 p-4">
+        <form method="GET" action="{{ url_for('dashboard') }}" class="flex flex-col sm:flex-row gap-4">
+            <div class="relative flex-grow">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </div>
+                <input type="text" name="search" value="{{ search }}" placeholder="Search by username or name..."
+                    class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg focus:ring-primary focus:border-primary block pl-10 p-2.5 placeholder-slate-500">
+            </div>
+
+            <div class="relative w-full sm:w-64">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <i class="fa-solid fa-user-tie"></i>
+                </div>
+                <select name="parent"
+                    class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg focus:ring-primary focus:border-primary block pl-10 p-2.5 appearance-none shadow-inner cursor-pointer"
+                    onchange="this.form.submit()">
+                    <option value="">All Parents (Distributors)</option>
+                    {% for p in unique_parents %}
+                    <option value="{{ p }}" {% if parent==p %}selected{% endif %}>{{ p }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="relative w-full sm:w-48">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <i class="fa-solid fa-signal"></i>
+                </div>
+                <select name="status"
+                    class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg focus:ring-primary focus:border-primary block pl-10 p-2.5 appearance-none shadow-inner cursor-pointer"
+                    onchange="this.form.submit()">
+                    <option value="">All Statuses</option>
+                    <option value="active" {% if status=='active' %}selected{% endif %}>🟢 Active Only</option>
+                    <option value="inactive" {% if status=='inactive' %}selected{% endif %}>🔴 Inactive Only</option>
+                </select>
+            </div>
+
+            <button type="submit"
+                class="bg-primary hover:bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-primary/20">
+                Search
+            </button>
+            {% if search or parent or status %}
+            <a href="{{ url_for('dashboard') }}"
+                class="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors border border-slate-600 flex items-center justify-center">
+                Clear
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Data Table layer -->
+    <div class="glass-panel rounded-xl overflow-hidden shadow-xl border border-slate-700/50">
+        <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+            <table class="w-full text-sm text-left text-slate-300">
+                <thead
+                    class="text-xs text-slate-400 uppercase bg-slate-800/80 border-b border-slate-700 sticky top-0 z-10">
+                    <tr>
+                        <th scope="col" class="px-4 py-4 font-semibold tracking-wider hidden sm:table-cell">ID</th>
+                        <th scope="col" class="px-4 py-4 font-semibold tracking-wider">Username</th>
+                        <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-amber-200 hidden md:table-cell"><i
+                                class="fa-solid fa-user-tie mr-1"></i> Parent</th>
+                        <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-blue-400 hidden lg:table-cell"><i
+                                class="fa-solid fa-phone mr-1"></i> Phone</th>
+                        <th scope="col" class="px-4 py-4 font-semibold tracking-wider hidden xl:table-cell">Profile</th>
+                        <th scope="col" class="px-4 py-4 font-semibold tracking-wider hidden lg:table-cell">Expiration</th>
+                        <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-center">Status</th>
+                        <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700/50">
+                    {% if users %}
+                    {% for user in users %}
+                    <tr class="hover:bg-slate-800/40 transition-colors">
+                        <td class="px-4 py-4 whitespace-nowrap text-slate-500 hidden sm:table-cell text-xs">#{{ user.id }}</td>
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            <span class="font-bold text-white block text-xs sm:text-sm">{{ user.username }}</span>
+                            {% if user.firstname or user.lastname %}
+                            <span class="text-[10px] text-slate-500 line-clamp-1">{{ user.firstname or '' }} {{ user.lastname or '' }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap hidden md:table-cell">
+                            {% if user.parent_username %}
+                            <span class="text-amber-400/80 font-medium bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 text-[10px]">
+                                {{ user.parent_username }}
+                            </span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap hidden lg:table-cell">
+                            <span class="text-blue-400 text-[11px] font-mono">
+                                {{ user.mobile or user.phone or '-' }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap hidden xl:table-cell">
+                            {% if user.profile_details %}
+                            <span class="bg-slate-700 text-slate-300 py-1 px-2 rounded text-[10px] border border-slate-600">
+                                {{ user.profile_details.name }}
+                            </span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-slate-400 hidden lg:table-cell text-xs">
+                            {{ user.expiration or '-' }}
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-center">
+                            {% if user.status and user.status.status %}
+                            <span class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse mx-auto shadow-[0_0_8px_rgba(16,185,129,0.5)]" title="Active"></span>
+                            {% else %}
+                            <span class="w-3 h-3 bg-red-500 rounded-full mx-auto" title="Inactive"></span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-center">
+                            <div class="flex items-center justify-center gap-1.5">
+                                <a href="{{ url_for('payments', search=user.username) }}"
+                                    class="p-1.5 bg-emerald-500/10 text-emerald-400 rounded hover:bg-emerald-500/20 transition-colors border border-emerald-500/20"
+                                    title="دفعات">
+                                    <i class="fa-solid fa-money-bill-wave text-[10px]"></i>
+                                </a>
+                                <a href="{{ url_for('complaints', search=user.username) }}"
+                                    class="p-1.5 bg-indigo-500/10 text-indigo-400 rounded hover:bg-indigo-500/20 transition-colors border border-indigo-500/20"
+                                    title="شكاوي">
+                                    <i class="fa-solid fa-wrench text-[10px]"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-slate-500">
+                            <div class="flex flex-col items-center justify-center">
+                                <i class="fa-regular fa-folder-open text-4xl mb-3 text-slate-600"></i>
+                                <p>No users found matching your criteria</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div class="px-6 py-4 bg-slate-800/30 border-t border-slate-700/50 flex items-center justify-between">
+            <span class="text-sm text-slate-500">
+                Showing page <span class="font-medium text-slate-300">{{ page }}</span> of <span
+                    class="font-medium text-slate-300">{{ total_pages }}</span>
+            </span>
+            <div class="flex space-x-2">
+                {% if page > 1 %}
+                <a href="{{ url_for('dashboard', page=page-1, search=search, parent=parent, status=status) }}"
+                    class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-md text-sm transition-colors border border-slate-600">
+                    <i class="fa-solid fa-chevron-left mr-1 text-xs"></i> Prev
+                </a>
+                {% endif %}
+
+                {% if page < total_pages %} <a
+                    href="{{ url_for('dashboard', page=page+1, search=search, parent=parent, status=status) }}"
+                    class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-md text-sm transition-colors border border-slate-600">
+                    Next <i class="fa-solid fa-chevron-right ml-1 text-xs"></i>
+                    </a>
+                    {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

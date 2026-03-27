@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+
+{% block title %}Complaints - Top Net Pay{% endblock %}
+
+{% block extra_head %}
+<!-- TomSelect for searchable dropdown -->
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+<style>
+    .ts-control {
+        background-color: #0d1117 !important;
+        border: 1px solid #30363d !important;
+        color: #f0f6fc !important;
+        border-radius: 0.5rem !important;
+        padding: 0.75rem 1rem !important;
+    }
+    .ts-dropdown {
+        background-color: #161b22 !important;
+        border: 1px solid #30363d !important;
+        color: #f0f6fc !important;
+        border-radius: 0.5rem !important;
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4) !important;
+    }
+    .ts-control>input {
+        color: #f0f6fc !important;
+    }
+    .ts-dropdown .option {
+        padding: 8px 12px;
+        border-bottom: 1px solid #30363d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include 'navbar.html' %}
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-8">
+    <!-- Header -->
+    <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold mb-2">نظام الشكاوي (Complaints)</h1>
+            <p class="text-slate-400 text-sm">تسجيل وتتبع شكاوي المشتركين وطلبات الصيانة.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            {% if session.get('role') in ['admin', 'manager'] %}
+            <a href="{{ url_for('export_complaints') }}" class="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center">
+                <i class="fa-solid fa-file-excel mr-2"></i> تصدير البيانات
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Stats Dashboard -->
+    <div class="grid {% if session.get('role') == 'maintenance' %}grid-cols-2 lg:grid-cols-4{% else %}grid-cols-2 lg:grid-cols-2{% endif %} gap-4 mb-8">
+        <div class="glass-panel p-4 rounded-xl border border-white/5 shadow-lg">
+            <div class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">إجمالي الشكاوي</div>
+            <div class="text-2xl font-bold text-white">{{ stats.total_all }}</div>
+        </div>
+        {% if session.get('role') == 'maintenance' %}
+        <div class="glass-panel p-4 rounded-xl border border-blue-500/10 shadow-lg">
+            <div class="text-[10px] text-blue-400 uppercase font-bold tracking-widest mb-1">مهامي الحالية</div>
+            <div class="text-2xl font-bold text-blue-400">{{ stats.total_my }}</div>
+        </div>
+        <div class="glass-panel p-4 rounded-xl border border-emerald-500/10 shadow-lg">
+            <div class="text-[10px] text-emerald-400 uppercase font-bold tracking-widest mb-1">حللتها أنا</div>
+            <div class="text-2xl font-bold text-emerald-400">{{ stats.resolved_my }}</div>
+        </div>
+        {% endif %}
+        <div class="glass-panel p-4 rounded-xl border border-slate-500/10 shadow-lg">
+            <div class="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">انتهت بالكامل</div>
+            <div class="text-2xl font-bold text-slate-300">{{ stats.resolved_all }}</div>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="mb-6 p-4 rounded-lg flex items-center {% if category == 'success' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% else %}bg-red-500/10 text-red-400 border border-red-500/20{% endif %}">
+            <i class="fa-solid {% if category == 'success' %}fa-check-circle{% else %}fa-circle-exclamation{% endif %} mr-3"></i>
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Add Complaint Form -->
+        <div class="lg:col-span-1">
+            <div class="glass-panel shadow-xl rounded-xl p-6 sticky top-24">
+                <h3 class="text-lg font-bold mb-6 border-b border-white/5 pb-3 flex items-center">
+                    <i class="fa-solid fa-plus-circle text-primary mr-2"></i> تسجيل شكوى جديدة
+                </h3>
+                <form method="POST" class="space-y-4">
+                    <input type="hidden" name="action" value="add">
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">بحث عن المشترك</label>
+                        <select id="user-select" name="username" required>
+                            <option value="">Search by username or name...</option>
+                            {% for user in all_users %}
+                                <option value="{{ user.username }}" 
+                                        data-fullname="{{ user.firstname or '' }} {{ user.lastname or '' }}" 
+                                        data-phone="{{ user.mobile or user.phone or '' }}"
+                                        data-connection-type="{{ user.connection_type or '' }}"
+                                        data-dish-ip="{{ user.dish_ip or '' }}">
+                                    {{ user.username }} ({{ user.firstname or '' }} {{ user.lastname or '' }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <input type="hidden" name="fullname" id="fullname_hidden">
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">نوع الإتصال</label>
+                            <select id="connection_type" name="connection_type" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 shadow-inner cursor-pointer" onchange="toggleDishIp()">
+                                <option value="">غير محدد</option>
+                                <option value="صحن">صحن</option>
+                                <option value="علبة">علبة</option>
+                            </select>
+                        </div>
+                        <div id="dish_ip_container" class="hidden">
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">أيبــي الصحن (IP)</label>
+                            <input type="text" name="dish_ip" id="dish_ip" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 shadow-inner placeholder-slate-600" placeholder="192.168.x.x">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">رقم الهاتف 1</label>
+                            <input type="text" name="phone1" id="phone1" required class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 shadow-inner">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">رقم الهاتف 2</label>
+                            <input type="text" name="phone2" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 shadow-inner placeholder-slate-600" placeholder="Optional">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">المنطقة</label>
+                        <input type="text" name="area" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 shadow-inner">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">تفاصيل العنوان</label>
+                        <textarea name="address_details" rows="2" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 shadow-inner placeholder-slate-600" placeholder="Street, Building, Landmark..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">إحالة إلى (موظف الصيانة)</label>
+                        <select name="assigned_to" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 shadow-inner cursor-pointer">
+                            <option value="">بدون إحالة</option>
+                            {% for m_user in maintenance_users %}
+                            <option value="{{ m_user.username }}">{{ m_user.username }} ({{ m_user.maintenance_id }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">تفاصيل الشكوى</label>
+                        <textarea name="complaint_text" required rows="4" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 shadow-inner placeholder-slate-600" placeholder="Describe the issue..."></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-primary hover:bg-blue-600 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-primary/20">
+                        <i class="fa-solid fa-save mr-1"></i> حفظ الشكوى
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Complaints List -->
+        <div class="lg:col-span-2">
+            <!-- Table Controls -->
+            <div class="mb-4 flex flex-wrap gap-4 items-center justify-between">
+                <form method="GET" class="flex gap-2 w-full sm:w-auto">
+                    <input type="text" name="search" value="{{ request.args.get('search', '') }}" placeholder="بحث بالاسم، المستخدم، الهاتف أو العنوان..." 
+                           class="flex-grow bg-slate-800/80 border border-slate-700 text-white text-sm rounded-lg p-2.5 focus:ring-primary focus:border-primary shadow-inner">
+                    {% if session.get('role') in ['admin', 'manager', 'employee'] %}
+                    <select name="assigned" class="bg-slate-800/80 border border-slate-700 text-slate-300 text-sm rounded-lg p-2.5 focus:ring-primary focus:border-primary shadow-inner">
+                        <option value="">جميع المكلفين</option>
+                        <option value="unassigned" {% if request.args.get('assigned') == 'unassigned' %}selected{% endif %}>غير مكلف</option>
+                        {% for m_user in maintenance_users %}
+                        <option value="{{ m_user.username }}" {% if request.args.get('assigned') == m_user.username %}selected{% endif %}>{{ m_user.username }}</option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
+                    <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-white px-4 rounded-lg border border-slate-600 transition-colors">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                    {% if request.args.get('status') %}
+                    <input type="hidden" name="status" value="{{ request.args.get('status') }}">
+                    {% endif %}
+                </form>
+                
+                <div class="flex flex-wrap gap-2">
+                    <a href="{{ url_for('complaints', status='') }}" class="text-xs font-bold px-3 py-1.5 rounded-full border {% if not request.args.get('status') and not request.args.get('assigned') %}bg-primary/20 text-primary border-primary/30{% else %}bg-slate-800 text-slate-400 border-slate-700{% endif %}">الكل</a>
+                    <a href="{{ url_for('complaints', assigned='me') }}" class="text-xs font-bold px-3 py-1.5 rounded-full border {% if request.args.get('assigned') == 'me' %}bg-blue-500/20 text-blue-400 border-blue-500/30{% else %}bg-slate-800 text-slate-400 border-slate-700{% endif %}">مهامي فقط</a>
+                    <a href="{{ url_for('complaints', status='Open') }}" class="text-xs font-bold px-3 py-1.5 rounded-full border {% if request.args.get('status') == 'Open' %}bg-amber-500/20 text-amber-500 border-amber-500/30{% else %}bg-slate-800 text-slate-400 border-slate-700{% endif %}">جديد</a>
+                    <a href="{{ url_for('complaints', status='Resolved') }}" class="text-xs font-bold px-3 py-1.5 rounded-full border {% if request.args.get('status') == 'Resolved' %}bg-emerald-500/20 text-emerald-500 border-emerald-500/30{% else %}bg-slate-800 text-slate-400 border-slate-700{% endif %}">محلول</a>
+                </div>
+            </div>
+
+            <div class="glass-panel overflow-hidden rounded-xl border border-white/5">
+                <div class="overflow-x-auto overflow-y-auto" style="max-height: 800px;">
+                    <table class="w-full text-sm text-right text-slate-300">
+                        <thead class="text-xs text-slate-400 uppercase bg-slate-800/80 sticky top-0 z-10 border-b border-slate-700">
+                            <tr>
+                                <th class="px-5 py-4 font-bold text-center hidden sm:table-cell">ID</th>
+                                <th class="px-5 py-4 font-bold">المشترك</th>
+                                <th class="px-5 py-4 font-bold hidden md:table-cell">العنوان وهواتف التواصل</th>
+                                <th class="px-5 py-4 font-bold hidden lg:table-cell">المكلف بها</th>
+                                <th class="px-5 py-4 font-bold hidden sm:table-cell">الشكوى</th>
+                                <th class="px-5 py-4 font-bold text-center">الحالة</th>
+                                <th class="px-5 py-4 font-bold text-center">الإجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            {% for c in complaints %}
+                            <tr class="hover:bg-slate-800/40 transition-colors group cursor-pointer" 
+                                data-href="{{ url_for('view_complaint', c_id=c.id) }}"
+                                onclick="window.location.href=this.getAttribute('data-href');">
+                                <td class="px-5 py-4 text-center text-slate-500 hidden sm:table-cell">#{{ c.id }}</td>
+                                <td class="px-5 py-4">
+                                    <div class="font-bold text-white text-xs sm:text-sm">{{ c.fullname or c.username }}</div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[9px] text-slate-500 font-mono">{{ c.username }}</span>
+                                    </div>
+                                </td>
+                                <td class="px-5 py-4 hidden md:table-cell">
+                                    <div class="text-xs text-amber-400 font-bold mb-1">
+                                        <i class="fa-solid fa-location-dot mr-1"></i> {{ c.area or 'N/A' }} 
+                                    </div>
+                                    <div class="flex flex-col gap-0.5 text-[10px]">
+                                        <span class="text-blue-400"><i class="fa-solid fa-phone mr-1"></i> {{ c.phone1 }}</span>
+                                    </div>
+                                </td>
+                                <td class="px-5 py-4 hidden lg:table-cell">
+                                    <div class="flex items-center text-xs text-blue-300 font-bold">
+                                        {{ c.assigned_to or 'غير مكلف' }}
+                                    </div>
+                                </td>
+                                <td class="px-5 py-4 hidden sm:table-cell">
+                                    <a href="{{ url_for('view_complaint', c_id=c.id) }}" class="block max-w-[150px] truncate text-[11px] text-slate-400 hover:text-primary transition-colors hover:underline">
+                                        {{ c.complaint_text }}
+                                    </a>
+                                </td>
+                                <td class="px-5 py-4 text-center">
+                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-bold border 
+                                        {% if c.status == 'Open' %}bg-amber-500/10 text-amber-500 border-amber-500/20
+                                        {% elif c.status == 'In Progress' %}bg-blue-500/10 text-blue-500 border-blue-500/20
+                                        {% elif c.status == 'Resolved' %}bg-emerald-500/10 text-emerald-500 border-emerald-500/20
+                                        {% else %}bg-slate-500/10 text-slate-400 border-slate-500/20{% endif %}">
+                                        {{ c.status }}
+                                    </span>
+                                </td>
+                                <td class="px-5 py-4 text-center">
+                                     <div class="flex flex-col gap-2">
+                                         {% if session.get('role') in ['admin', 'manager', 'employee'] or (session.get('role') == 'maintenance' and c.status not in ['Resolved', 'Closed']) %}
+                                           <button onclick="event.stopPropagation(); openUpdateModal(this);" 
+                                                  data-id="{{ c.id|escape }}"
+                                                  data-status="{{ c.status|escape }}"
+                                                  data-notes="{{ (c.maintenance_notes or '')|escape }}"
+                                                  data-assigned="{{ (c.assigned_to or '')|escape }}"
+                                                  data-connection-type="{{ (c.connection_type or '')|escape }}"
+                                                  data-dish-ip="{{ (c.dish_ip or '')|escape }}"
+                                                  class="text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-2.5 py-1.5 rounded border border-emerald-500/20 text-xs font-bold transition-all relative z-10">
+                                               تحديث الحالة
+                                           </button>
+                                         {% endif %}
+
+                                         {% if session.get('role') == 'maintenance' and not c.assigned_to %}
+                                         <form method="POST">
+                                             <input type="hidden" name="action" value="assign_self">
+                                             <input type="hidden" name="complaint_id" value="{{ c.id }}">
+                                              <button type="submit" onclick="event.stopPropagation();" class="w-full text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2.5 py-1.5 rounded border border-blue-500/20 text-xs font-bold transition-all relative z-10">
+                                                  استلام المهمة
+                                              </button>
+                                         </form>
+                                         {% endif %}
+
+                                          {% if session.get('role') not in ['admin', 'manager', 'employee', 'maintenance'] or (session.get('role') == 'maintenance' and c.status in ['Resolved', 'Closed']) %}
+                                          <span class="text-slate-600 text-[10px] italic">No Action</span>
+                                          {% endif %}
+                                     </div>
+                                 </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="px-5 py-12 text-center text-slate-500 italic">No complaints found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Update Status Modal -->
+<div id="update_modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700 max-w-md w-full shadow-2xl">
+        <h3 class="text-white font-bold text-xl mb-4 flex items-center">
+            <i class="fa-solid fa-wrench text-emerald-400 mr-2"></i> تحديث حالة الشكوى
+        </h3>
+        <form method="POST" class="space-y-4">
+            <input type="hidden" name="action" value="update_status">
+            <input type="hidden" name="complaint_id" id="complaint_id">
+            
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2">الحالة الجديدة</label>
+                <select name="status" id="complaint_status" required
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500 transition-colors shadow-inner">
+                    <option value="Open">جديد (Open)</option>
+                    <option value="In Progress">قيد العمل (In Progress)</option>
+                    <option value="Pending">معلق (Pending)</option>
+                    <option value="Resolved">تم الإصلاح (Resolved)</option>
+                    <option value="Closed">مغلق (Closed)</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2">تعيين الموظف</label>
+                <select name="assigned_to" id="complaint_assigned" 
+                    {% if session.get('role') == 'maintenance' %}disabled class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-slate-500 cursor-not-allowed"{% else %}class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500 transition-colors shadow-inner cursor-pointer"{% endif %}>
+                    <option value="">بدون إحالة</option>
+                    {% for m_user in maintenance_users %}
+                    <option value="{{ m_user.username }}">{{ m_user.username }} ({{ m_user.maintenance_id }})</option>
+                    {% endfor %}
+                    {% if session.get('role') == 'maintenance' %}
+                    <option value="{{ session['username'] }}">{{ session['username'] }} (أنا)</option>
+                    {% endif %}
+                </select>
+                {% if session.get('role') == 'maintenance' %}
+                <p class="text-[10px] text-slate-500 mt-1">* موظفي الصيانة يمكنهم استلام المهام لأنفسهم فقط من خلال القائمة الرئيسية.</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2">ملاحظات الصيانة / تفاصيل الحل</label>
+                <textarea name="notes" id="maintenance_notes" rows="4" required
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500 transition-colors shadow-inner placeholder-slate-600"
+                    placeholder="Enter resolution details or maintenance notes..."></textarea>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-3 pb-2 border-t border-slate-800 pt-3 mt-2">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1.5">نوع الإتصال</label>
+                    <select name="connection_type" id="modal_connection_type" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 shadow-inner cursor-pointer" onchange="toggleModalDishIp()">
+                        <option value="">غير محدد</option>
+                        <option value="صحن">صحن</option>
+                        <option value="علبة">علبة</option>
+                    </select>
+                </div>
+                <div id="modal_dish_ip_container" class="hidden">
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1.5">أيبــي الصحن (IP)</label>
+                    <input type="text" name="dish_ip" id="modal_dish_ip" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 shadow-inner placeholder-slate-600" placeholder="192.168.x.x">
+                </div>
+            </div>
+            
+            <div class="flex gap-3 pt-4">
+                <button type="button" onclick="closeUpdateModal();" class="flex-1 px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-medium transition-colors">إلغاء</button>
+                <button type="submit" class="flex-1 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-lg shadow-emerald-500/20">حفظ التحديث</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<script>
+    function openUpdateModal(btn) {
+        const id = btn.getAttribute('data-id');
+        const status = btn.getAttribute('data-status');
+        const notes = btn.getAttribute('data-notes');
+        const assigned = btn.getAttribute('data-assigned');
+        const connType = btn.getAttribute('data-connection-type');
+        const dishIp = btn.getAttribute('data-dish-ip');
+
+        document.getElementById('complaint_id').value = id;
+        document.getElementById('complaint_status').value = status;
+        document.getElementById('maintenance_notes').value = notes;
+        const assignedEl = document.getElementById('complaint_assigned');
+        if (assignedEl) {
+            assignedEl.value = assigned;
+        }
+        
+        const connTypeEl = document.getElementById('modal_connection_type');
+        if (connTypeEl) {
+            connTypeEl.value = connType || '';
+            toggleModalDishIp();
+        }
+        const dishIpEl = document.getElementById('modal_dish_ip');
+        if (dishIpEl) {
+            dishIpEl.value = dishIp || '';
+        }
+
+        document.getElementById('update_modal').classList.remove('hidden');
+    }
+
+    function closeUpdateModal() {
+        document.getElementById('update_modal').classList.add('hidden');
+    }
+
+    function toggleModalDishIp() {
+        const type = document.getElementById('modal_connection_type').value;
+        const container = document.getElementById('modal_dish_ip_container');
+        if (container) {
+            if (type === 'صحن') {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+                document.getElementById('modal_dish_ip').value = '';
+            }
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const selectEl = document.getElementById('user-select');
+        if (selectEl) {
+            const userSelect = new TomSelect("#user-select", {
+                create: false,
+                dataAttr: 'data',
+                searchField: ['text', 'username'],
+                onItemAdd: function(value) {
+                    const option = this.options[value];
+                    if (option) {
+                        const fullname = option.fullname;
+                        const phone = option.phone;
+                        const connType = option["connection-type"];
+                        const dishIp = option["dish-ip"];
+                        
+                        document.getElementById('fullname_hidden').value = fullname || '';
+                        document.getElementById('phone1').value = phone || '';
+                        
+                        const connTypeEl = document.getElementById('connection_type');
+                        if (connTypeEl) {
+                            connTypeEl.value = connType || '';
+                            toggleDishIp();
+                        }
+                        const dishIpEl = document.getElementById('dish_ip');
+                        if (dishIpEl) {
+                            dishIpEl.value = dishIp || '';
+                        }
+                    }
+                },
+                render: {
+                    option: function(data, escape) {
+                        return '<div>' +
+                            '<span class="font-bold">' + escape(data.text) + '</span>' +
+                            '</div>';
+                    }
+                }
+            });
+        }
+    });
+
+    function toggleDishIp() {
+        const type = document.getElementById('connection_type').value;
+        const container = document.getElementById('dish_ip_container');
+        if (container) {
+            if (type === 'صحن') {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+                document.getElementById('dish_ip').value = '';
+            }
+        }
+    }
+
+    // Close modal on escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === "Escape") {
+            closeUpdateModal();
+        }
+    });
+</script>
+{% endblock %}

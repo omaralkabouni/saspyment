@@ -1,0 +1,257 @@
+<!-- Modern Responsive Navbar -->
+<nav class="glass-panel sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+            <!-- Logo & Desktop Nav -->
+            <div class="flex items-center space-x-8">
+                <a href="{{ url_for('dashboard') }}" class="flex items-center space-x-3 group">
+                    <img src="/image/LOGO.png" alt="Logo" class="h-9 w-auto object-contain rounded-lg group-hover:scale-105 transition-transform">
+                    <span class="font-bold text-lg text-white tracking-tight hidden xs:block">Top Net Syria</span>
+                </a>
+                
+                <!-- Desktop Links -->
+                <div class="hidden lg:flex items-center space-x-1">
+                    {% if session.get('role') != 'maintenance' %}
+                    <a href="{{ url_for('dashboard') }}" 
+                       class="{% if request.path == url_for('dashboard') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %} px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                        {% if session.get('lang', 'ar') == 'ar' %}لوحة التحكم{% else %}Dashboard{% endif %}
+                    </a>
+                    <a href="{{ url_for('payments') }}" 
+                       class="{% if request.path == url_for('payments') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %} px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                        {% if session.get('lang', 'ar') == 'ar' %}الدفعات{% else %}Payments{% endif %}
+                    </a>
+                    <a href="{{ url_for('expenses') }}" 
+                       class="{% if request.path == url_for('expenses') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %} px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                        {% if session.get('lang', 'ar') == 'ar' %}المصاريف{% else %}Expenses{% endif %}
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('complaints') }}" 
+                       class="{% if request.path == url_for('complaints') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %} px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                        {% if session.get('lang', 'ar') == 'ar' %}الشكاوي{% else %}Complaints{% endif %}
+                    </a>
+                    <a href="{{ url_for('installations') }}" 
+                       class="{% if request.path == url_for('installations') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %} px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                        {% if session.get('lang', 'ar') == 'ar' %}تركيبات{% else %}Installations{% endif %}
+                    </a>
+
+                    <!-- More / Admin Dropdown -->
+                    {% if session.get('role') in ['admin', 'manager'] %}
+                    <div class="relative group ml-2" id="admin-dropdown">
+                        <button onclick="toggleAdminDropdown()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition-colors">
+                            <span>{% if session.get('lang', 'ar') == 'ar' %}المزيد{% else %}More{% endif %}</span>
+                            <i class="fa-solid fa-chevron-down text-[10px] opacity-50"></i>
+                        </button>
+                        <div id="admin-dropdown-menu" class="hidden absolute left-0 mt-2 w-48 bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-2xl py-2 z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
+                            <a href="{{ url_for('report') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
+                                <i class="fa-solid fa-chart-pie w-4 opacity-70"></i> 
+                                {% if session.get('lang', 'ar') == 'ar' %}التقارير المالية{% else %}Financial Reports{% endif %}
+                            </a>
+                            <a href="{{ url_for('change_password') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
+                                <i class="fa-solid fa-key w-4 opacity-70"></i> 
+                                {% if session.get('lang', 'ar') == 'ar' %}تغيير كلمة المرور{% else %}Change Password{% endif %}
+                            </a>
+                            {% if session.get('role') == 'admin' %}
+                            <a href="{{ url_for('manage_users') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
+                                <i class="fa-solid fa-user-shield w-4 opacity-70"></i> 
+                                {% if session.get('lang', 'ar') == 'ar' %}إدارة الموظفين{% else %}Staff Management{% endif %}
+                            </a>
+                            <a href="{{ url_for('webhook_settings') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
+                                <i class="fa-solid fa-link w-4 opacity-70"></i> 
+                                {% if session.get('lang', 'ar') == 'ar' %}إعدادات الويب هوك{% else %}Webhook Settings{% endif %}
+                            </a>
+                            <a href="{{ url_for('backup_db') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
+                                <i class="fa-solid fa-database w-4 opacity-70"></i> 
+                                {% if session.get('lang', 'ar') == 'ar' %}تحميل نسخة احتياطية{% else %}Database Backup{% endif %}
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Right side Desktop -->
+            <div class="hidden lg:flex items-center space-x-4">
+                <!-- API & Sync Status -->
+                <div class="flex items-center space-x-3 mr-4 py-1.5 px-3 bg-slate-900/50 rounded-full border border-slate-700/50 shadow-inner">
+                    {% if api_status == 'online' %}
+                        <span class="flex h-2.5 w-2.5 relative">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                        </span>
+                        <span class="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">SAS Live</span>
+                    {% elif api_status == 'refreshing' %}
+                        <span class="flex h-2.5 w-2.5">
+                            <i class="fa-solid fa-sync fa-spin text-blue-400 text-[10px]"></i>
+                        </span>
+                        <span class="text-[10px] text-blue-400 font-bold uppercase tracking-widest">Syncing...</span>
+                    {% elif api_status == 'cached_recent' %}
+                        <span class="h-2.5 w-2.5 rounded-full bg-emerald-600/50"></span>
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Synced</span>
+                    {% else %}
+                        <span class="flex h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span>
+                        <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest">Offline</span>
+                    {% endif %}
+                    
+                    {% if session.get('role') != 'maintenance' %}
+                    <div class="h-4 w-[1px] bg-slate-700 mx-1"></div>
+                    <a href="{{ url_for('force_sync') }}" class="text-slate-400 hover:text-white transition-colors" title="Force SAS Data Sync">
+                        <i class="fa-solid fa-rotate text-xs"></i>
+                    </a>
+                    {% endif %}
+                </div>
+
+                <div class="h-8 w-[1px] bg-slate-700 mx-1"></div>
+
+                <div class="flex items-center space-x-3">
+                    <div class="flex flex-col items-end">
+                        <span class="text-xs font-bold text-white">{{ session.get('username', 'Admin') }}</span>
+                        <span class="text-[10px] text-slate-500 uppercase font-medium">{{ session.get('role', 'staff') }}</span>
+                    </div>
+                    <img src="https://ui-avatars.com/api/?name={{ session['username'] }}&background=0D8ABC&color=fff" alt="User" class="w-8 h-8 rounded-lg border border-slate-700">
+                </div>
+
+                
+                <!-- Language Toggle -->
+                {% if session.get('lang', 'ar') == 'ar' %}
+                <a href="{{ url_for('set_lang', lang='en') }}" class="w-auto px-2 h-8 flex items-center justify-center rounded-lg bg-slate-700/50 text-slate-300 border border-slate-600 hover:bg-slate-700 transition-colors text-xs font-bold" title="Switch to English">
+                    EN
+                </a>
+                {% else %}
+                <a href="{{ url_for('set_lang', lang='ar') }}" class="w-auto px-2 h-8 flex items-center justify-center rounded-lg bg-slate-700/50 text-slate-300 border border-slate-600 hover:bg-slate-700 transition-colors text-xs font-bold" title="التبديل للعربية">
+                    AR
+                </a>
+                {% endif %}
+
+                <a href="{{ url_for('logout') }}" class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-colors" title="Logout">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </a>
+            </div>
+
+            <!-- Mobile Menu Button -->
+            <div class="lg:hidden flex items-center space-x-4">
+                <div class="flex items-center space-x-2 mr-2">
+                    {% if api_status == 'online' %}
+                        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                    {% else %}
+                        <span class="h-2 w-2 rounded-full bg-red-500"></span>
+                    {% endif %}
+                </div>
+                <button type="button" onclick="toggleMobileMenu()" class="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700 transition-colors">
+                    <i id="menu-icon" class="fa-solid fa-bars-staggered text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Menu Dropdown -->
+    <div id="mobile-menu" class="hidden lg:hidden border-t border-slate-700/50 bg-slate-900/95 backdrop-blur-xl">
+        <div class="px-2 pt-2 pb-3 space-y-1">
+            {% if session.get('role') != 'maintenance' %}
+            <a href="{{ url_for('dashboard') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('dashboard') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-house w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}لوحة التحكم{% else %}Dashboard{% endif %}
+            </a>
+            <a href="{{ url_for('payments') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('payments') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-money-bill-transfer w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}الدفعات{% else %}Payments{% endif %}
+            </a>
+            <a href="{{ url_for('expenses') }}" class="block px-3 py-4 rounded-md text base font-medium {% if request.path == url_for('expenses') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-receipt w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}المصاريف{% else %}Expenses{% endif %}
+            </a>
+            {% endif %}
+            <a href="{{ url_for('complaints') }}" class="block px-3 py-4 rounded-md text base font-medium {% if request.path == url_for('complaints') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-headset w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}الشكاوي{% else %}Complaints{% endif %}
+            </a>
+            <a href="{{ url_for('installations') }}" class="block px-3 py-4 rounded-md text base font-medium {% if request.path == url_for('installations') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-screwdriver-wrench w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}تركيبات{% else %}Installations{% endif %}
+            </a>
+            {% if session.get('role') in ['admin', 'manager'] %}
+            <a href="{{ url_for('report') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('report') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-chart-pie w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}التقرير المالي{% else %}Financial Report{% endif %}
+            </a>
+            {% endif %}
+            {% if session.get('role') == 'admin' %}
+            <a href="{{ url_for('manage_users') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('manage_users') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-user-shield w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}إدارة الموظفين{% else %}Staff Management{% endif %}
+            </a>
+            <a href="{{ url_for('webhook_settings') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('webhook_settings') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-link w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}إعدادات الويب هوك{% else %}Webhook Settings{% endif %}
+            </a>
+            {% endif %}
+        </div>
+        <div class="pt-4 pb-3 border-t border-slate-700/50 px-4">
+            <div class="flex items-center">
+                <img src="https://ui-avatars.com/api/?name={{ session['username'] }}&background=0D8ABC&color=fff" alt="User" class="w-10 h-10 rounded-lg">
+                <div class="ml-3">
+                    <div class="text-sm font-bold text-white">{{ session.get('username', 'Admin') }}</div>
+                    <div class="text-[10px] text-slate-500 uppercase tracking-widest">{{ session.get('role', 'staff') }}</div>
+                </div>
+            </div>
+            <div class="mt-4 grid grid-cols-{% if session.get('role') == 'maintenance' %}3{% else %}4{% endif %} gap-2">
+                {% if session.get('role') != 'maintenance' %}
+                <a href="{{ url_for('backup_db') }}" class="flex flex-col items-center justify-center p-3 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    <i class="fa-solid fa-database mb-1"></i>
+                    <span class="text-[9px] font-bold">{% if session.get('lang', 'ar') == 'ar' %}نسخة{% else %}BACKUP{% endif %}</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('change_password') }}" class="flex flex-col items-center justify-center p-3 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    <i class="fa-solid fa-key mb-1"></i>
+                    <span class="text-[9px] font-bold">{% if session.get('lang', 'ar') == 'ar' %}كلمة{% else %}PASS{% endif %}</span>
+                </a>
+                <!-- Language toggle for mobile -->
+                {% if session.get('lang', 'ar') == 'ar' %}
+                <a href="{{ url_for('set_lang', lang='en') }}" class="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-700/50 text-slate-300 border border-slate-600">
+                    <i class="fa-solid fa-globe mb-1"></i>
+                    <span class="text-[9px] font-bold">EN</span>
+                </a>
+                {% else %}
+                <a href="{{ url_for('set_lang', lang='ar') }}" class="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-700/50 text-slate-300 border border-slate-600">
+                    <i class="fa-solid fa-globe mb-1"></i>
+                    <span class="text-[9px] font-bold">AR</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('logout') }}" class="flex flex-col items-center justify-center p-3 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20">
+                    <i class="fa-solid fa-right-from-bracket mb-1"></i>
+                    <span class="text-[9px] font-bold">LOGOUT</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<script>
+    function toggleMobileMenu() {
+        const menu = document.getElementById('mobile-menu');
+        const icon = document.getElementById('menu-icon');
+        const isHidden = menu.classList.contains('hidden');
+        
+        if (isHidden) {
+            menu.classList.remove('hidden');
+            icon.classList.remove('fa-bars-staggered');
+            icon.classList.add('fa-xmark');
+        } else {
+            menu.classList.add('hidden');
+            icon.classList.remove('fa-xmark');
+            icon.classList.add('fa-bars-staggered');
+        }
+    }
+
+    function toggleAdminDropdown() {
+        const menu = document.getElementById('admin-dropdown-menu');
+        if (menu) menu.classList.toggle('hidden');
+    }
+
+    // Close dropdown when clicking outside
+    window.addEventListener('click', function(e) {
+        const dropdown = document.getElementById('admin-dropdown');
+        const menu = document.getElementById('admin-dropdown-menu');
+        if (dropdown && !dropdown.contains(e.target)) {
+            if (menu && !menu.classList.contains('hidden')) {
+                menu.classList.add('hidden');
+            }
+        }
+    });
+
+    if (themeToggleBtn) {
+        // removed toggle logic
+    }
+</script>

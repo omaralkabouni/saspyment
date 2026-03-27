@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Login - SAS Radius Dashboard{% endblock %}
+
+{% block content %}
+<div class="flex-grow flex items-center justify-center relative overflow-hidden">
+    
+    <!-- Background Accents -->
+    <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-pulse"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-accent rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-pulse" style="animation-delay: 2s;"></div>
+
+    <div class="w-full max-w-md z-10 px-4">
+        <div class="glass-panel rounded-2xl shadow-2xl overflow-hidden">
+            <div class="p-8">
+                <div class="text-center mb-10 border-b border-slate-700 pb-6">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full mx-auto flex items-center justify-center mb-4 shadow-lg shadow-primary/30">
+                        <i class="fa-solid fa-server text-2xl text-white"></i>
+                    </div>
+                    <h2 class="text-3xl font-bold tracking-tight text-white">Top Net Pay</h2>
+                    <p class="text-slate-400 mt-2 text-sm">Professional Control Dashboard</p>
+                </div>
+
+                {% with messages = get_flashed_messages(category_filter=["error"]) %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="bg-red-500/10 border border-red-500/50 text-red-500 text-sm px-4 py-3 rounded-lg flex items-center mb-6">
+                                <i class="fa-solid fa-circle-exclamation mr-2"></i> {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST" action="">
+                    <div class="mb-5 relative">
+                        <label for="username" class="block text-sm font-medium text-slate-400 mb-2">Username</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
+                                <i class="fa-regular fa-user"></i>
+                            </span>
+                            <input type="text" id="username" name="username" required
+                                class="w-full bg-slate-800/50 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder-gray-600 shadow-inner"
+                                placeholder="Enter your username">
+                        </div>
+                    </div>
+
+                    <div class="mb-8 relative">
+                        <label for="password" class="block text-sm font-medium text-slate-400 mb-2">Password</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
+                                <i class="fa-solid fa-lock"></i>
+                            </span>
+                            <input type="password" id="password" name="password" required
+                                class="w-full bg-slate-800/50 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder-gray-600 shadow-inner"
+                                placeholder="Enter your password">
+                        </div>
+                    </div>
+
+                    <button type="submit"
+                        class="w-full py-3 px-4 bg-gradient-to-r from-primary to-accent hover:from-blue-600 hover:to-blue-500 text-white font-semibold rounded-lg shadow-lg shadow-primary/20 hover:shadow-primary/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-primary transition-all duration-300 transform hover:-translate-y-0.5">
+                        Sign In <i class="fa-solid fa-arrow-right ml-2 opacity-70"></i>
+                    </button>
+                </form>
+            </div>
+            <div class="px-8 py-4 bg-slate-800/50 border-t border-slate-700/50 text-center">
+                <p class="text-xs text-slate-500">Server: 193.43.140.218 (Secure Connection)</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

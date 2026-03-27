@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Expenses - Top Net Pay{% endblock %}
+
+{% block extra_head %}
+<script>
+    function openDeleteModal(id) {
+        document.getElementById('delete_form').action = "/expenses/delete/" + id;
+        document.getElementById('delete_modal').classList.remove('hidden');
+    }
+    function closeDeleteModal() { document.getElementById('delete_modal').classList.add('hidden'); }
+</script>
+{% endblock %}
+
+{% block content %}
+{% include 'navbar.html' %}
+
+<!-- Main container -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-8">
+    
+    <!-- Header -->
+    <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold mb-2">Company Expenses</h1>
+            <p class="text-slate-400 text-sm">Track outwards cash flow, operational server costs, and salaries.</p>
+        </div>
+        <div class="flex items-center space-x-3 bg-slate-800/80 p-1.5 rounded-lg border border-slate-700 w-full sm:w-auto">
+            <form action="{{ url_for('export_expenses') }}" method="GET" class="flex items-center w-full space-x-2">
+                <div class="relative flex-grow">
+                    <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-slate-500 text-xs font-bold">From</div>
+                    <input type="date" name="start_date" value="{{ current_date }}" required
+                           class="w-full bg-slate-900 border border-slate-700 text-[13px] text-white rounded-lg focus:ring-rose-500 focus:border-rose-500 block pl-10 p-2 cursor-pointer shadow-inner">
+                </div>
+                <div class="relative flex-grow">
+                    <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-slate-500 text-xs font-bold">To</div>
+                    <input type="date" name="end_date" value="{{ current_date }}" required
+                           class="w-full bg-slate-900 border border-slate-700 text-[13px] text-white rounded-lg focus:ring-rose-500 focus:border-rose-500 block pl-7 p-2 cursor-pointer shadow-inner">
+                </div>
+                <button type="submit" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-lg shadow-rose-500/30 flex items-center shrink-0">
+                    <i class="fa-solid fa-file-excel mr-2"></i> Export
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="mb-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="bg-slate-800/80 border border-slate-700 px-6 py-5 rounded-xl shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-sm text-slate-400 uppercase tracking-widest font-bold mb-1"><i class="fa-regular fa-calendar-day mr-1"></i> Today's Expenses</p>
+                <p class="text-3xl font-bold text-rose-400">{{ "{:,.0f}".format(daily_total) }} <span class="text-base font-normal text-rose-500">ل.س</span></p>
+            </div>
+            <div class="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
+                <i class="fa-solid fa-arrow-trend-down text-rose-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="bg-slate-800/80 border border-slate-700 px-6 py-5 rounded-xl shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-sm text-slate-400 uppercase tracking-widest font-bold mb-1"><i class="fa-regular fa-calendar-days mr-1"></i> This Month's Expenses</p>
+                <p class="text-3xl font-bold text-rose-400">{{ "{:,.0f}".format(monthly_total) }} <span class="text-base font-normal text-rose-500">ل.س</span></p>
+            </div>
+            <div class="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
+                <i class="fa-solid fa-chart-pie text-rose-500 text-xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Registration Form -->
+        <div class="lg:col-span-1">
+            <div class="glass-panel rounded-xl shadow-xl border border-slate-700/50 p-6 sticky top-24">
+                <h2 class="text-lg font-bold text-white mb-6 border-b border-slate-700/50 pb-3">Log New Expense</h2>
+                
+                {% with messages = get_flashed_messages(category_filter=["success"]) %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 text-sm px-4 py-3 rounded-lg flex items-center mb-6 transition-all duration-500">
+                                <i class="fa-solid fa-check-circle mr-2 w-5"></i><span>{{ message }}</span>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                {% with messages = get_flashed_messages(category_filter=["error"]) %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="bg-red-500/10 border border-red-500/50 text-red-500 text-sm px-4 py-3 rounded-lg flex items-center mb-6 transition-all duration-500">
+                                <i class="fa-solid fa-circle-exclamation mr-2 w-5"></i><span>{{ message }}</span>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST" action="{{ url_for('expenses') }}" class="space-y-5">
+                    
+                    <div>
+                        <label for="category" class="block text-sm font-medium text-slate-400 mb-2">Category (الفئة)</label>
+                        <select id="category" name="category" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all">
+                            <option value="">Select Category...</option>
+                            <option value="Salaries (رواتب)">Salaries (رواتب)</option>
+                            <option value="Server/API Costs (تكاليف سيرفر)">Server/API Costs (تكاليف سيرفر)</option>
+                            <option value="Internet/Utilities (إنترنت وخدمات)">Internet/Utilities (إنترنت وخدمات)</option>
+                            <option value="Equipment (معدات وصيانة)">Equipment (معدات وصيانة)</option>
+                            <option value="Office Rent (إيجار مكتب)">Office Rent (إيجار مكتب)</option>
+                            <option value="Vehicle / Transportation (مصاريف مركبات)">Vehicle / Transportation (مصاريف مركبات)</option>
+                            <option value="Miscellaneous (متفرقات)">Miscellaneous (متفرقات)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="amount" class="block text-sm font-medium text-slate-400 mb-2">Amount (المبلغ)</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 font-medium">ل.س</span>
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-rose-500">
+                                <i class="fa-solid fa-coins"></i>
+                            </div>
+                            <input type="number" step="1" id="amount" name="amount" required
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-12 py-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all placeholder-slate-600"
+                                placeholder="0">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="description" class="block text-sm font-medium text-slate-400 mb-2">Description (ملاحظات - اختياري)</label>
+                        <textarea id="description" name="description" rows="3"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all placeholder-slate-600"
+                            placeholder="Reason for this expense..."></textarea>
+                    </div>
+
+                    <button type="submit"
+                        class="w-full py-3 px-4 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold rounded-lg shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-rose-500 transition-all duration-300">
+                        <i class="fa-solid fa-plus mr-1"></i> Register Expense (Enter)
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Expenses Log Table -->
+        <div class="lg:col-span-2">
+            <div class="glass-panel rounded-xl overflow-hidden shadow-xl border border-slate-700/50 h-full flex flex-col">
+                <div class="px-6 py-4 border-b border-slate-700/50 bg-slate-800/40">
+                    <h2 class="text-lg font-bold text-white">Recent Expenses</h2>
+                </div>
+                
+                <div class="overflow-x-auto overflow-y-auto flex-grow" style="max-height: 800px;">
+                    <table class="w-full text-sm text-left text-slate-300">
+                        <thead class="text-xs text-slate-400 uppercase bg-slate-800/80 sticky top-0 z-10 border-b border-slate-700">
+                            <tr>
+                                <th scope="col" class="px-6 py-4 font-semibold tracking-wider w-2">ID</th>
+                                <th scope="col" class="px-6 py-4 font-semibold tracking-wider">Category & Description</th>
+                                <th scope="col" class="px-6 py-4 font-semibold tracking-wider text-right">Amount (SYP)</th>
+                                <th scope="col" class="px-6 py-4 font-semibold tracking-wider text-left pl-6">Admin / Date</th>
+                                <th scope="col" class="px-6 py-4 font-semibold tracking-wider text-center w-10">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/50">
+                            {% if recent_expenses %}
+                                {% for expense in recent_expenses %}
+                                <tr class="hover:bg-slate-800/40 transition-colors group">
+                                    <td class="px-6 py-4 whitespace-nowrap text-slate-500 align-top pt-5">#{{ expense.id }}</td>
+                                    
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="font-bold text-rose-200 block">{{ expense.category }}</span>
+                                        {% if expense.description and expense.description.strip() != '' %}
+                                            <span class="text-xs text-slate-400 block break-words whitespace-normal max-w-[250px] mt-1 italic"><i class="fa-solid fa-comment-dots mr-1"></i>{{ expense.description }}</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td class="px-6 py-4 whitespace-nowrap text-right align-top pt-5">
+                                        <span class="text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded border border-rose-500/20 text-sm block min-w-[100px]">
+                                            {{ "{:,.0f}".format(expense.amount) }} ل.س
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-left pl-6 align-top pt-5 text-xs">
+                                        <div class="flex flex-col space-y-1 text-slate-300">
+                                            <span><i class="fa-solid fa-user-shield text-slate-400 w-3 mr-1"></i> {{ expense.admin_name }}</span>
+                                            <span class="text-slate-400"><i class="fa-regular fa-clock text-slate-400 w-3 mr-1"></i> {{ expense.created_at[:16] }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center align-top pt-5">
+                                        <div class="flex items-center space-x-2 opacity-100 lg:opacity-30 group-hover:opacity-100 transition-opacity justify-center">
+                                            <button data-id="{{ expense.id }}" onclick="openDeleteModal(this.dataset.id)" class="w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors" title="Delete Expense">
+                                                <i class="fa-solid fa-trash text-xs"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="px-6 py-12 text-center text-slate-500">
+                                        <div class="flex flex-col items-center justify-center">
+                                            <i class="fa-regular fa-folder-open text-4xl mb-3 text-slate-600"></i>
+                                            <p>No expenses registered yet.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div id="delete_modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-xl border border-slate-700 max-w-sm w-full shadow-2xl">
+        <h3 class="text-white font-bold text-xl mb-2"><i class="fa-solid fa-triangle-exclamation text-red-500 mr-2"></i>Delete Expense Record</h3>
+        <p class="text-sm text-slate-400 mb-4">You are about to permanently delete this expense log. This cannot be undone.</p>
+        <form id="delete_form" method="POST" action="" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2"><i class="fa-solid fa-key text-red-400 mr-1 text-xs"></i> System Delete Password</label>
+                <input type="password" name="admin_pass" required autocomplete="off"
+                    class="w-full bg-slate-900 border border-red-500/50 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-1 focus:ring-red-500 transition-colors"
+                    placeholder="Enter password from delete_password.txt">
+            </div>
+            
+            <div class="flex space-x-3 pt-4">
+                <button type="button" onclick="closeDeleteModal()" class="flex-1 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-medium transition-colors">Cancel</button>
+                <button type="submit" class="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium transition-colors">Confirm Deletion</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Auto-dismiss alert messages after 3 seconds
+        setTimeout(() => {
+            document.querySelectorAll('.bg-emerald-500\\/10, .bg-red-500\\/10').forEach(alert => {
+                if (alert.querySelector('.fa-check-circle') || alert.querySelector('.fa-circle-exclamation')) {
+                    alert.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-10px)';
+                    setTimeout(() => alert.remove(), 500);
+                }
+            });
+        }, 3000);
+    });
+</script>
+{% endblock %}

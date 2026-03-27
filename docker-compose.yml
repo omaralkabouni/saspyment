@@ -1,0 +1,18 @@
+version: '3.3'
+
+services:
+  sas-dashboard:
+    build: .
+    container_name: sas-dashboard
+    restart: always
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - SECRET_KEY=change_this_to_something_secure
+      - DB_PATH=/app/data/payments.db
+      - SAS_API_IP=193.43.140.218
+      - WEBHOOK_URL=https://your-n8n-webhook-url.com

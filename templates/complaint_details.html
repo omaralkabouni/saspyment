@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}تفاصيل الشكوى #{{ c.id }} - Top Net Pay{% endblock %}
+
+{% block content %}
+{% include 'navbar.html' %}
+
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <!-- Breadcrumb -->
+    <nav class="flex mb-6 text-sm text-slate-400" aria-label="Breadcrumb">
+        <ol class="inline-flex items-center space-x-1 md:space-x-3 rtl:space-x-reverse">
+            <li class="inline-flex items-center">
+                <a href="{{ url_for('complaints') }}" class="hover:text-white transition-colors">
+                    <i class="fa-solid fa-list-check mr-2"></i> قائمة الشكاوي
+                </a>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <i class="fa-solid fa-chevron-right mx-2 text-slate-600 text-[10px]"></i>
+                    <span class="text-slate-200">تفاصيل الشكوى #{{ c.id }}</span>
+                </div>
+            </li>
+        </ol>
+    </nav>
+
+    <!-- Header Card -->
+    <div class="glass-panel rounded-2xl overflow-hidden border border-white/5 shadow-2xl mb-8">
+        <div class="bg-slate-800/50 p-6 border-b border-white/5 flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-white flex items-center">
+                    الشكوى رقم #{{ c.id }}
+                    <span class="mr-3 px-3 py-1 rounded-full text-xs font-bold border 
+                        {% if c.status == 'Open' %}bg-amber-500/10 text-amber-500 border-amber-500/20
+                        {% elif c.status == 'In Progress' %}bg-blue-500/10 text-blue-500 border-blue-500/20
+                        {% elif c.status == 'Resolved' %}bg-emerald-500/10 text-emerald-500 border-emerald-500/20
+                        {% else %}bg-slate-500/10 text-slate-400 border-slate-500/20{% endif %}">
+                        {{ c.status }}
+                    </span>
+                </h1>
+                <p class="text-slate-400 text-sm mt-1">تاريخ التسجيل: {{ c.created_at }}</p>
+            </div>
+            <div class="flex gap-2">
+                <a href="{{ url_for('complaints') }}" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold transition-all border border-slate-600">
+                    <i class="fa-solid fa-arrow-right mr-2"></i> العودة للقائمة
+                </a>
+            </div>
+        </div>
+
+        <div class="p-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+                <!-- Subscriber Section -->
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-xs font-bold text-primary uppercase tracking-widest mb-4 border-b border-primary/20 pb-2">بيانات المشترك</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-start">
+                                <div class="w-8 mt-1 text-slate-500"><i class="fa-solid fa-user"></i></div>
+                                <div>
+                                    <div class="text-[10px] text-slate-500 uppercase font-bold">الاسم الكامل / اسم المستخدم</div>
+                                    <div class="text-white font-bold">{{ c.fullname or 'N/A' }}</div>
+                                    <div class="flex items-center gap-2 mt-0.5">
+                                        <span class="text-xs text-slate-500 font-mono">{{ c.username }}</span>
+                                        {% if c.registered_by %}
+                                        <span class="text-[10px] bg-white/5 text-slate-400 px-2 py-0.5 rounded flex items-center">
+                                            <i class="fa-solid fa-pen-nib mr-1 text-slate-600"></i>
+                                            <span class="mr-1">سجلها:</span> {{ c.registered_by }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-start">
+                                <div class="w-8 mt-1 text-slate-500"><i class="fa-solid fa-phone"></i></div>
+                                <div>
+                                    <div class="text-[10px] text-slate-500 uppercase font-bold">أرقام التواصل</div>
+                                    <div class="text-emerald-400 font-bold">{{ c.phone1 }}</div>
+                                    {% if c.phone2 %}<div class="text-emerald-500/70 font-bold">{{ c.phone2 }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="flex items-start">
+                                <div class="w-8 mt-1 text-slate-500"><i class="fa-solid fa-location-dot"></i></div>
+                                <div>
+                                    <div class="text-[10px] text-slate-500 uppercase font-bold">العنوان والمنطقة</div>
+                                    <div class="text-amber-400 font-bold">{{ c.area or 'N/A' }}</div>
+                                    <div class="text-sm text-slate-300">{{ c.address_details or 'لا يوجد تفاصيل إضافية' }}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-start">
+                                <div class="w-8 mt-1 text-slate-500"><i class="fa-solid fa-wifi"></i></div>
+                                <div>
+                                    <div class="text-[10px] text-slate-500 uppercase font-bold">نوع الإتصال</div>
+                                    <div class="text-indigo-400 font-bold">{{ c.connection_type or 'غير محدد' }}</div>
+                                    {% if c.connection_type == 'صحن' and c.dish_ip %}
+                                    <div class="text-xs text-emerald-400 font-mono mt-1 border border-white/5 bg-slate-800 px-2 py-0.5 rounded inline-block shadow-inner">IP: {{ c.dish_ip }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-4 border-b border-blue-400/20 pb-2">المسؤول عن المهمة</h3>
+                        <div class="flex items-center p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
+                            <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 mr-3">
+                                <i class="fa-solid fa-user-gear"></i>
+                            </div>
+                            <div>
+                                <div class="text-white font-bold">{{ c.assigned_to or 'غير مكلف حالياً' }}</div>
+                                <div class="text-[10px] text-slate-500">آخر تحديث: {{ c.updated_at or 'N/A' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Complaint Content Section -->
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-xs font-bold text-red-400 uppercase tracking-widest mb-4 border-b border-red-400/20 pb-2">تفاصيل المشكلة</h3>
+                        <div class="p-4 rounded-xl bg-red-500/5 border border-red-500/10 text-slate-200 leading-relaxed whitespace-pre-wrap">
+                            {{ c.complaint_text }}
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-4 border-b border-emerald-400/20 pb-2">ملاحظات الصيانة والحل</h3>
+                        <div class="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 min-h-[100px]">
+                            {% if c.maintenance_notes %}
+                                <div class="text-emerald-300 leading-relaxed whitespace-pre-wrap">{{ c.maintenance_notes }}</div>
+                                <div class="mt-4 pt-4 border-t border-emerald-500/10 flex items-center justify-between">
+                                    <span class="text-[10px] text-emerald-500/50 uppercase font-bold">Technical ID: {{ c.maintenance_user_id }}</span>
+                                    <i class="fa-solid fa-circle-check text-emerald-500"></i>
+                                </div>
+                            {% else %}
+                                <div class="text-slate-600 italic text-sm text-center py-6">
+                                    لا توجد ملاحظات تقنية حتى الآن.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Complaints History Section -->
+        {% if user_history %}
+        <div class="bg-indigo-900/10 p-8 border-t border-indigo-500/20">
+            <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-6 flex items-center">
+                <i class="fa-solid fa-clock-rotate-left mr-2 text-base"></i> الترتيب الزمني لشكاوي المشترك ({{ user_history|length }})
+            </h3>
+            <div class="relative">
+                <!-- Timeline Line -->
+                <div class="absolute right-0 top-0 bottom-0 w-px bg-indigo-500/20 mr-6"></div>
+                
+                <div class="space-y-6">
+                    {% for past_c in user_history %}
+                    <div class="relative flex rtl:flex-row-reverse group cursor-pointer" onclick="window.location.href='{{ url_for('view_complaint', c_id=past_c.id) }}';">
+                        <!-- Bullet -->
+                        <div class="absolute right-0 top-3 w-4 h-4 rounded-full bg-slate-900 border-[3px] border-indigo-500/50 z-10 mr-[1.10rem] group-hover:bg-indigo-500 group-hover:border-indigo-400 transition-all shadow-[0_0_10px_rgba(99,102,241,0.2)] group-hover:shadow-[0_0_15px_rgba(99,102,241,0.6)]"></div>
+                        
+                        <div class="mr-12 w-full">
+                            <div class="glass-panel p-5 rounded-2xl border border-indigo-500/10 bg-slate-800/40 group-hover:bg-slate-800/80 group-hover:border-indigo-500/30 transition-all shadow-inner relative overflow-hidden">
+                                <!-- Hover accent left border -->
+                                <div class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500/0 group-hover:bg-indigo-500/80 transition-all duration-300"></div>
+                                
+                                <div class="flex flex-col sm:flex-row sm:items-start justify-between mb-3 gap-3 border-b border-indigo-500/10 pb-3">
+                                    <div>
+                                        <div class="flex items-center gap-3 mb-1">
+                                            <span class="text-sm font-bold text-slate-200 group-hover:text-indigo-300 transition-colors">طلب صيانة #{{ past_c.id }}</span>
+                                            <span class="px-2.5 py-0.5 rounded text-[10px] font-bold border whitespace-nowrap
+                                                {% if past_c.status == 'Open' %}bg-amber-500/10 text-amber-500 border-amber-500/20
+                                                {% elif past_c.status == 'In Progress' %}bg-blue-500/10 text-blue-500 border-blue-500/20
+                                                {% elif past_c.status == 'Resolved' %}bg-emerald-500/10 text-emerald-500 border-emerald-500/20
+                                                {% else %}bg-slate-500/10 text-slate-400 border-slate-500/20{% endif %}">
+                                                {{ past_c.status }}
+                                            </span>
+                                        </div>
+                                        <div class="text-[11px] text-slate-400 font-mono flex items-center flex-wrap gap-y-1">
+                                            <span><i class="fa-regular fa-clock mr-1.5 opacity-70"></i> {{ past_c.created_at }}</span>
+                                            {% if past_c.connection_type %}
+                                            <span class="mx-2 text-slate-600">|</span>
+                                            <span class="text-indigo-400 font-bold"><i class="fa-solid fa-wifi mr-1.5 opacity-70"></i> {{ past_c.connection_type }}</span>
+                                            {% if past_c.connection_type == 'صحن' and past_c.dish_ip %}
+                                            <span class="ml-2 bg-slate-900 border border-white/5 px-1.5 py-0.5 rounded text-emerald-400 font-mono text-[9px] shadow-inner">IP: {{ past_c.dish_ip }}</span>
+                                            {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold hidden sm:flex items-center">
+                                        عرض التفاصيل <i class="fa-solid fa-arrow-left ml-2"></i>
+                                    </div>
+                                </div>
+                                
+                                <div class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap pl-3 border-l-2 border-slate-700/50">
+                                    {{ past_c.complaint_text }}
+                                </div>
+                                
+                                {% if past_c.maintenance_notes %}
+                                <div class="mt-4 pt-4 border-t border-indigo-500/10">
+                                    <div class="flex items-start gap-3 bg-emerald-500/5 rounded-xl p-3 border border-emerald-500/10 group-hover:border-emerald-500/20 transition-colors">
+                                        <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0 mt-0.5">
+                                            <i class="fa-solid fa-screwdriver-wrench text-[10px]"></i>
+                                        </div>
+                                        <div>
+                                            <span class="text-[10px] font-bold text-emerald-500/80 uppercase block mb-1">الرد أو الإجراء المتخذ:</span>
+                                            <div class="text-xs text-emerald-100/80 leading-relaxed italic">
+                                                {{ past_c.maintenance_notes }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Footer Actions -->
+        <div class="bg-slate-800/30 p-6 border-t border-white/5 flex justify-end">
+             <a href="{{ url_for('complaints') }}" class="text-slate-400 hover:text-white transition-colors flex items-center text-sm font-bold">
+                إغلاق التفاصيل <i class="fa-solid fa-xmark ml-2"></i>
+             </a>
+        </div>
+    </div>
+
+    <!-- History Logs Section -->
+    <div class="mt-12 mb-20">
+        <h2 class="text-xl font-bold text-white mb-6 flex items-center">
+            <i class="fa-solid fa-history text-slate-500 mr-2"></i> سجل المتابعة والتحديثات (History)
+        </h2>
+        
+        <div class="relative">
+            <!-- Timeline Line -->
+            <div class="absolute right-0 top-0 bottom-0 w-px bg-slate-800 mr-6"></div>
+
+            <div class="space-y-8">
+                {% if logs %}
+                    {% for log in logs %}
+                    <div class="relative flex rtl:flex-row-reverse group">
+                        <!-- Bullet -->
+                        <div class="absolute right-0 top-1.5 w-3 h-3 rounded-full bg-slate-700 border-2 border-slate-900 z-10 mr-[1.15rem] group-hover:bg-primary transition-colors"></div>
+                        
+                        <div class="mr-12 w-full">
+                            <div class="glass-panel p-5 rounded-2xl border border-white/5 shadow-lg group-hover:border-primary/20 transition-all">
+                                <div class="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-xs font-bold text-white">{{ log.action_by }}</span>
+                                        <span class="text-[10px] text-slate-500 font-mono">{{ log.created_at }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] text-slate-500 line-through opacity-50">{{ log.old_status }}</span>
+                                        <i class="fa-solid fa-arrow-left text-[10px] text-slate-600 px-1"></i>
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold 
+                                            {% if log.new_status == 'Open' %}bg-amber-500/10 text-amber-500
+                                            {% elif log.new_status == 'In Progress' %}bg-blue-500/10 text-blue-500
+                                            {% elif log.new_status == 'Resolved' %}bg-emerald-500/10 text-emerald-500
+                                            {% else %}bg-slate-500/10 text-slate-400{% endif %}">
+                                            {{ log.new_status }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap italic">
+                                    " {{ log.notes or 'تحديث الحالة بدون ملاحظات إضافية.' }} "
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-10 bg-slate-900/50 rounded-2xl border border-dashed border-slate-800">
+                        <i class="fa-solid fa-ghost text-slate-800 text-3xl mb-3"></i>
+                        <p class="text-slate-600 text-sm italic">لا يوجد سجل تاريخي لهذه الشكوى حتى الآن.</p>
+                    </div>
+                {% endif %}
+
+                <!-- Initial creation log item -->
+                <div class="relative flex rtl:flex-row-reverse group">
+                    <div class="absolute right-0 top-1.5 w-3 h-3 rounded-full bg-indigo-500/50 border-2 border-slate-900 z-10 mr-[1.15rem]"></div>
+                    <div class="mr-12 w-full">
+                        <div class="glass-panel p-5 rounded-2xl border border-indigo-500/10 bg-indigo-500/5 shadow-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs font-bold text-white">{{ c.registered_by or 'System' }}</span>
+                                    <span class="text-[10px] text-indigo-400/50 font-mono">{{ c.created_at }}</span>
+                                </div>
+                                <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">البداية / التسجيل</span>
+                            </div>
+                            <div class="text-sm text-slate-400 italic">تم إنشاء الشكوى وتسجيلها في النظام.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

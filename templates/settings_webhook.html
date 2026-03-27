@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+
+{% block title %}{% if session.get('lang', 'ar') == 'ar' %}إعدادات الويب هوك{% else %}Webhook Settings{% endif %} - Top Net Pay{% endblock %}
+
+{% block content %}
+{% include 'navbar.html' %}
+
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-10">
+    <!-- Header -->
+    <div class="mb-10 text-center animate-in fade-in slide-in-from-top-4 duration-700">
+        <h1 class="text-4xl font-black text-white mb-3 flex items-center justify-center gap-3">
+            <div class="w-12 h-12 bg-blue-600/20 rounded-2xl flex items-center justify-center border border-blue-500/30">
+                <i class="fa-solid fa-link text-blue-500"></i>
+            </div>
+            {% if session.get('lang', 'ar') == 'ar' %}إعدادات الويب هوك{% else %}Webhook Settings{% endif %}
+        </h1>
+        <p class="text-slate-400 max-w-2xl mx-auto">
+            {% if session.get('lang', 'ar') == 'ar' %}
+            قم بتخصيص التنبيهات التلقائية لكل قناة بشكل منفصل. يمكنك تفعيل أو تعطيل الأحداث التي تهمك فقط.
+            {% else %}
+            Customize automated notifications for each channel independently. Enable or disable the events that matter to you.
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Flash Messages (Local) -->
+    <div class="max-w-3xl mx-auto">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-6 p-4 rounded-xl flex items-center gap-3 animate-in slide-in-from-right-4 duration-500 {% if category == 'success' %}bg-emerald-500/10 border border-emerald-500/20 text-emerald-400{% else %}bg-rose-500/10 border border-rose-500/20 text-rose-400{% endif %}">
+                        <i class="fa-solid {% if category == 'success' %}fa-circle-check{% else %}fa-triangle-exclamation{% endif %}"></i>
+                        <span class="text-sm font-bold">{{ message }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <form method="POST" class="space-y-8">
+        <input type="hidden" name="test_type" id="test_type" value="payments">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- PAYMENTS -->
+            <div class="glass-panel p-6 rounded-2xl border border-slate-700/50 shadow-2xl bg-gradient-to-br from-emerald-500/5 to-transparent flex flex-col h-full transform transition-all hover:border-emerald-500/30">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                            <i class="fa-solid fa-money-bill-transfer text-emerald-400"></i>
+                        </div>
+                        <h2 class="text-lg font-bold text-white">{% if session.get('lang', 'ar') == 'ar' %}الدفعات{% else %}Payments{% endif %}</h2>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="webhook_payments_enabled" value="1" class="sr-only peer" {% if s_dict.get('webhook_payments_enabled', '1') == '1' %}checked{% endif %}>
+                        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 shadow-inner"></div>
+                    </label>
+                </div>
+                
+                <div class="flex-grow space-y-6">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">{% if session.get('lang', 'ar') == 'ar' %}رابط التحويل (Webhook URL){% else %}Webhook URL{% endif %}</label>
+                        <input type="url" name="webhook_payments" value="{{ s_dict.get('webhook_payments', '') }}" placeholder="https://..." class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500/50 transition-all outline-none shadow-inner">
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-700/50">
+                        <p class="text-[10px] font-bold text-slate-500 uppercase mb-3 px-1">{% if session.get('lang', 'ar') == 'ar' %}الأحداث المدعومة{% else %}Events{% endif %}</p>
+                        <div class="flex items-center px-1">
+                            <i class="fa-solid fa-check-circle text-emerald-500 text-xs mr-2"></i>
+                            <span class="text-xs text-slate-400">{% if session.get('lang', 'ar') == 'ar' %}عند تسجيل دفعة جديدة{% else %}New Payment Registered{% endif %}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <button type="submit" name="action" value="test" onclick="setTestType('payments')" class="w-full py-3 px-4 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all text-xs font-bold flex items-center justify-center gap-2 group">
+                        <i class="fa-solid fa-paper-plane group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform"></i>
+                        {% if session.get('lang', 'ar') == 'ar' %}تجربة القناة{% else %}Test Channel{% endif %}
+                    </button>
+                </div>
+            </div>
+
+            <!-- COMPLAINTS -->
+            <div class="glass-panel p-6 rounded-2xl border border-slate-700/50 shadow-2xl bg-gradient-to-br from-rose-500/5 to-transparent flex flex-col h-full transform transition-all hover:border-rose-500/30">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center border border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.2)]">
+                            <i class="fa-solid fa-headset text-rose-400"></i>
+                        </div>
+                        <h2 class="text-lg font-bold text-white">{% if session.get('lang', 'ar') == 'ar' %}الشكاوي{% else %}Complaints{% endif %}</h2>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="webhook_complaints_enabled" value="1" class="sr-only peer" {% if s_dict.get('webhook_complaints_enabled', '1') == '1' %}checked{% endif %}>
+                        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500 shadow-inner"></div>
+                    </label>
+                </div>
+                
+                <div class="flex-grow space-y-6">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">{% if session.get('lang', 'ar') == 'ar' %}رابط التحويل (Webhook URL){% else %}Webhook URL{% endif %}</label>
+                        <input type="url" name="webhook_complaints" value="{{ s_dict.get('webhook_complaints', '') }}" placeholder="https://..." class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-rose-500/50 transition-all outline-none shadow-inner">
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-700/50 space-y-3">
+                        <p class="text-[10px] font-bold text-slate-500 uppercase px-1 mb-2">{% if session.get('lang', 'ar') == 'ar' %}الأحداث (Events){% else %}Events{% endif %}</p>
+                        
+                        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="webhook_complaints_on_new" value="1" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-rose-500 focus:ring-rose-500/20" {% if s_dict.get('webhook_complaints_on_new', '1') == '1' %}checked{% endif %}>
+                            <span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">{% if session.get('lang', 'ar') == 'ar' %}عند تسجيل شكوى جديدة{% else %}New Complaint Created{% endif %}</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="webhook_complaints_on_assign" value="1" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-rose-500 focus:ring-rose-500/20" {% if s_dict.get('webhook_complaints_on_assign', '1') == '1' %}checked{% endif %}>
+                            <span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">{% if session.get('lang', 'ar') == 'ar' %}عند إحالة الشكوى لموظف{% else %}Complaint Assigned{% endif %}</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="webhook_complaints_on_update" value="1" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-rose-500 focus:ring-rose-500/20" {% if s_dict.get('webhook_complaints_on_update', '1') == '1' %}checked{% endif %}>
+                            <span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">{% if session.get('lang', 'ar') == 'ar' %}عند تحديث الشكوى (بدون حل){% else %}Complaint Updated (Not Resolved){% endif %}</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="webhook_complaints_on_resolve" value="1" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-rose-500 focus:ring-rose-500/20" {% if s_dict.get('webhook_complaints_on_resolve', '1') == '1' %}checked{% endif %}>
+                            <span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">{% if session.get('lang', 'ar') == 'ar' %}عند حل الشكوى{% else %}Complaint Resolved{% endif %}</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <button type="submit" name="action" value="test" onclick="setTestType('complaints')" class="w-full py-3 px-4 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition-all text-xs font-bold flex items-center justify-center gap-2 group">
+                        <i class="fa-solid fa-paper-plane group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform"></i>
+                        {% if session.get('lang', 'ar') == 'ar' %}تجربة القناة{% else %}Test Channel{% endif %}
+                    </button>
+                </div>
+            </div>
+
+            <!-- INSTALLATIONS -->
+            <div class="glass-panel p-6 rounded-2xl border border-slate-700/50 shadow-2xl bg-gradient-to-br from-blue-500/5 to-transparent flex flex-col h-full transform transition-all hover:border-blue-500/30">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                            <i class="fa-solid fa-screwdriver-wrench text-blue-400"></i>
+                        </div>
+                        <h2 class="text-lg font-bold text-white">{% if session.get('lang', 'ar') == 'ar' %}التركيبات{% else %}Installations{% endif %}</h2>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="webhook_installations_enabled" value="1" class="sr-only peer" {% if s_dict.get('webhook_installations_enabled', '1') == '1' %}checked{% endif %}>
+                        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 shadow-inner"></div>
+                    </label>
+                </div>
+                
+                <div class="flex-grow space-y-6">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">{% if session.get('lang', 'ar') == 'ar' %}رابط التحويل (Webhook URL){% else %}Webhook URL{% endif %}</label>
+                        <input type="url" name="webhook_installations" value="{{ s_dict.get('webhook_installations', '') }}" placeholder="https://..." class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-500/50 transition-all outline-none shadow-inner">
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-700/50 space-y-3">
+                        <p class="text-[10px] font-bold text-slate-500 uppercase px-1 mb-2">{% if session.get('lang', 'ar') == 'ar' %}الأحداث (Events){% else %}Events{% endif %}</p>
+                        
+                        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="webhook_installations_on_new" value="1" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-blue-500/20" {% if s_dict.get('webhook_installations_on_new', '1') == '1' %}checked{% endif %}>
+                            <span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">{% if session.get('lang', 'ar') == 'ar' %}عند طلب تركيب جديد{% else %}New Installation Request{% endif %}</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="webhook_installations_on_assign" value="1" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-blue-500/20" {% if s_dict.get('webhook_installations_on_assign', '1') == '1' %}checked{% endif %}>
+                            <span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">{% if session.get('lang', 'ar') == 'ar' %}عند إحالة طلب التركيب لموظف{% else %}Installation Assigned{% endif %}</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="webhook_installations_on_update" value="1" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-blue-500/20" {% if s_dict.get('webhook_installations_on_update', '1') == '1' %}checked{% endif %}>
+                            <span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">{% if session.get('lang', 'ar') == 'ar' %}عند تحديث تفاصيل طلب التركيب{% else %}Installation Updated{% endif %}</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="webhook_installations_on_complete" value="1" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-blue-500/20" {% if s_dict.get('webhook_installations_on_complete', '1') == '1' %}checked{% endif %}>
+                            <span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">{% if session.get('lang', 'ar') == 'ar' %}عند إتمام التركيب{% else %}Installation Completed{% endif %}</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <button type="submit" name="action" value="test" onclick="setTestType('installations')" class="w-full py-3 px-4 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-all text-xs font-bold flex items-center justify-center gap-2 group">
+                        <i class="fa-solid fa-paper-plane group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform"></i>
+                        {% if session.get('lang', 'ar') == 'ar' %}تجربة القناة{% else %}Test Channel{% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <input type="hidden" name="test_type" id="test_type" value="payments">
+
+        <div class="pt-10 flex justify-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
+            <button type="submit" name="action" value="save" class="px-14 py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xl shadow-[0_10px_30px_rgba(37,99,235,0.4)] hover:shadow-[0_15px_40px_rgba(37,99,235,0.6)] transition-all transform hover:-translate-y-1 active:translate-y-0 active:scale-95 flex items-center gap-3">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                {% if session.get('lang', 'ar') == 'ar' %}حفظ جميع الإعدادات{% else %}Save All Settings{% endif %}
+            </button>
+        </div>
+    </form>
+
+    <!-- DANGER ZONE -->
+    <div class="mt-16 glass-panel p-8 rounded-3xl border border-rose-500/20 bg-rose-500/5 shadow-inner">
+        <h3 class="text-rose-500 font-black mb-6 flex items-center gap-3 text-xl">
+            <i class="fa-solid fa-triangle-exclamation animate-pulse"></i>
+            {% if session.get('lang', 'ar') == 'ar' %}منطقة الخطر (Danger Zone){% else %}Danger Zone{% endif %}
+        </h3>
+        <p class="text-slate-400 text-sm mb-8 leading-relaxed">
+            {% if session.get('lang', 'ar') == 'ar' %}
+            تحذير: العمليات أدناه ستقوم بمسح البيانات بشكل نهائي من قاعدة البيانات. لا يمكن التراجع عن هذه الخطوات.
+            كلمة مرور الحذف المتوفرة حالياً هي: <span class="font-mono text-rose-400 font-bold bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 select-all">{{ deletion_password }}</span> 
+            {% else %}
+            Warning: The operations below will permanently delete data from the database. These actions cannot be undone.
+            The current deletion password is: <span class="font-mono text-rose-400 font-bold bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 select-all">{{ deletion_password }}</span>
+            {% endif %}
+        </p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Clear Payments -->
+            <button onclick="confirmDeletion(this)" data-target="payments" data-label="{% if session.get('lang', 'ar') == 'ar' %}الدفعات{% else %}Payments{% endif %}" class="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-all font-bold text-sm flex flex-col items-center gap-3 group">
+                <i class="fa-solid fa-money-bill-wave text-xl group-hover:scale-110 transition-transform"></i>
+                {% if session.get('lang', 'ar') == 'ar' %}مسح الدفعات{% else %}Clear Payments{% endif %}
+            </button>
+
+            <!-- Clear Complaints -->
+            <button onclick="confirmDeletion(this)" data-target="complaints" data-label="{% if session.get('lang', 'ar') == 'ar' %}الشكاوي{% else %}Complaints{% endif %}" class="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-all font-bold text-sm flex flex-col items-center gap-3 group">
+                <i class="fa-solid fa-headset text-xl group-hover:scale-110 transition-transform"></i>
+                {% if session.get('lang', 'ar') == 'ar' %}مسح الشكاوي{% else %}Clear Complaints{% endif %}
+            </button>
+
+            <!-- Clear Installations -->
+            <button onclick="confirmDeletion(this)" data-target="installations" data-label="{% if session.get('lang', 'ar') == 'ar' %}التركيبات{% else %}Installations{% endif %}" class="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-all font-bold text-sm flex flex-col items-center gap-3 group">
+                <i class="fa-solid fa-screwdriver-wrench text-xl group-hover:scale-110 transition-transform"></i>
+                {% if session.get('lang', 'ar') == 'ar' %}مسح التركيبات{% else %}Clear Installations{% endif %}
+            </button>
+
+            <!-- Clear Expenses -->
+            <button onclick="confirmDeletion(this)" data-target="expenses" data-label="{% if session.get('lang', 'ar') == 'ar' %}المصاريف{% else %}Expenses{% endif %}" class="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-all font-bold text-sm flex flex-col items-center gap-3 group">
+                <i class="fa-solid fa-file-invoice-dollar text-xl group-hover:scale-110 transition-transform"></i>
+                {% if session.get('lang', 'ar') == 'ar' %}مسح المصاريف{% else %}Clear Expenses{% endif %}
+            </button>
+        </div>
+    </div>
+
+    <div class="mt-16 glass-panel p-8 rounded-3xl border border-slate-700/50 bg-slate-900/30">
+        <h3 class="text-white font-bold mb-6 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <i class="fa-solid fa-circle-info text-blue-400 text-sm"></i>
+            </div>
+            {% if session.get('lang', 'ar') == 'ar' %}كيفية الاستخدام والأتمتة{% else %}Usage & Automation Guide{% endif %}
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm text-slate-400 leading-relaxed">
+            <div class="space-y-4">
+                <p>
+                    {% if session.get('lang', 'ar') == 'ar' %}
+                    هذا النظام يتيح لك ربط لوحة التحكم بأي نظام خارجي (مثل n8n.io). يتم إرسال البيانات فور حدوث أي من الأحداث المحددة أعلاه.
+                    {% else %}
+                    This system allows you to connect your dashboard to any external automation tool (like n8n.io). Data is sent instantly when any of the selected events occur.
+                    {% endif %}
+                </p>
+                <div class="flex items-center gap-3 text-emerald-400 font-bold bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/10">
+                    <i class="fa-solid fa-lock"></i>
+                    {% if session.get('lang', 'ar') == 'ar' %}تشفير البيانات مضمون{% else %}Data encryption guaranteed{% endif %}
+                </div>
+            </div>
+            <div class="bg-black/20 p-4 rounded-xl border border-slate-800">
+                <p class="text-[11px] font-mono text-slate-500 mb-2 uppercase tracking-tighter">Sample Payload (JSON)</p>
+                <pre class="text-[10px] font-mono text-blue-400 overflow-x-auto">
+{
+  "id": "123",
+  "username": "customer_01",
+  "event": "new_complaint",
+  "timestamp": "2026-03-27 ..."
+}
+                </pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function setTestType(type) {
+    document.getElementById('test_type').value = type;
+}
+
+function confirmDeletion(btn) {
+    const target = btn.getAttribute('data-target');
+    const label = btn.getAttribute('data-label');
+    const modal = document.getElementById('deletion_modal');
+    document.getElementById('deletion_target_input').value = target;
+    document.getElementById('deletion_target_name').innerText = label;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeDeletionModal() {
+    const modal = document.getElementById('deletion_modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+</script>
+
+<!-- DELETION MODAL -->
+<div id="deletion_modal" class="hidden fixed inset-0 z-[100] items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md animate-in fade-in duration-300">
+    <div class="glass-panel w-full max-w-md p-8 rounded-3xl border border-rose-500/30 shadow-[0_20px_50px_rgba(244,63,94,0.3)] bg-slate-900">
+        <div class="mb-6 text-center">
+            <div class="w-16 h-16 bg-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-500/30">
+                <i class="fa-solid fa-trash-can text-rose-500 text-2xl"></i>
+            </div>
+            <h3 class="text-white text-2xl font-black mb-2">{% if session.get('lang', 'ar') == 'ar' %}تأكيد الحذف النهائي{% else %}Confirm Deletion{% endif %}</h3>
+            <p class="text-slate-400 text-sm">
+                {% if session.get('lang', 'ar') == 'ar' %}أنت على وشك مسح جميع بيانات <span id="deletion_target_name" class="text-rose-400 font-bold"></span>! لا يمكن التراجع.{% else %}You are about to clear all <span id="deletion_target_name" class="text-rose-400 font-bold"></span> data! This cannot be undone.{% endif %}
+            </p>
+        </div>
+
+        <form method="POST">
+            <input type="hidden" name="action" value="clear_data">
+            <input type="hidden" name="target" id="deletion_target_input">
+            
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2 px-1">{% if session.get('lang', 'ar') == 'ar' %}كلمة مرور الحذف (Master Password){% else %}Master Password{% endif %}</label>
+                <input type="password" name="password" required placeholder="••••••••" class="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-rose-500/50 outline-none transition-all">
+            </div>
+
+            <div class="flex gap-3">
+                <button type="button" onclick="closeDeletionModal()" class="flex-1 py-3 px-4 rounded-xl border border-slate-700 text-slate-400 hover:bg-slate-800 transition-all font-bold text-sm">
+                    {% if session.get('lang', 'ar') == 'ar' %}إلغاء{% else %}Cancel{% endif %}
+                </button>
+                <button type="submit" class="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition-all font-black text-sm shadow-lg shadow-rose-600/30">
+                    {% if session.get('lang', 'ar') == 'ar' %}نعم، امسح الآن{% else %}Yes, Delete All{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

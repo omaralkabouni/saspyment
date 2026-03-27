@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فاتورة - {{ p.username }}</title>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #fff;
+            color: #000;
+            width: 80mm;
+            /* Standard Thermal Printer Width */
+        }
+
+        .receipt {
+            width: 100%;
+            padding: 5mm;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 5mm;
+        }
+
+        .logo {
+            max-width: 40mm;
+            height: auto;
+            margin-bottom: 2mm;
+        }
+
+        .company-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 3mm 0;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 1mm;
+        }
+
+        .info-label {
+            font-weight: bold;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin: 3mm 0;
+        }
+
+        .items-table th {
+            text-align: right;
+            border-bottom: 1px solid #000;
+            padding: 1mm 0;
+        }
+
+        .items-table td {
+            padding: 2mm 0;
+        }
+
+        .total-section {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 3mm;
+            padding: 2mm;
+            border: 1px solid #000;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 10px;
+            margin-top: 5mm;
+        }
+
+        .print-btn {
+            background: #000;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            margin-bottom: 5mm;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+            font-weight: bold;
+        }
+
+        @media print {
+            .print-btn {
+                display: none;
+            }
+
+            body {
+                width: 80mm;
+            }
+
+            @page {
+                margin: 0;
+                size: 80mm auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="receipt">
+        <button class="print-btn" onclick="window.print()">طباعة (كاشير)</button>
+
+        <div class="header">
+            <img src="/image/LOGO.png" class="logo" alt="Logo">
+            <p class="company-name">Top Net Syria</p>
+            <p style="font-size: 10px; margin: 0;">لخدمات الإنترنت والاتصالات</p>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="info-row">
+            <span class="info-label">رقم الفاتورة:</span>
+            <span>#{{ p.id }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label"><i class="fa-regular fa-calendar-days" style="font-size: 14px; color: #000;"></i></span>
+            <span>{{ p.created_at.split(' ')[0] }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label"><i class="fa-regular fa-clock" style="font-size: 14px; color: #000;"></i></span>
+            <span>{{ p.created_at.split(' ')[1] if ' ' in p.created_at else '' }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">الموظف:</span>
+            <span>{{ p.admin_name }}</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="info-row">
+            <span class="info-label">المشترك:</span>
+            <span>{{ p.fullname or p.username }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">المستخدم:</span>
+            <span>{{ p.username }}</span>
+        </div>
+        {% if p.phone %}
+        <div class="info-row">
+            <span class="info-label">رقم الهاتف:</span>
+            <span>{{ p.phone }}</span>
+        </div>
+        {% endif %}
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>الوصف</th>
+                    <th style="text-align: left;">المبلغ</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>شحن رصيد ({{ p.profile_name }}) - شهر {{ p.created_at[5:7] }}</td>
+                    <td style="text-align: left;">{{ p.amount }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="total-section">
+            المجموع: {{ p.amount }} ل.س
+            {% if p.amount == 0 %}
+                <div style="color: red; font-size: 14px; margin-top: 5px;">(غير مدفوع)</div>
+            {% else %}
+                <div style="color: green; font-size: 14px; margin-top: 5px;">(تم الدفع)</div>
+            {% endif %}
+        </div>
+
+        <div class="footer">
+            <p>شكراً لتعاملكم معنا</p>
+            <p>Top Net Syria - سوريا-دمشق</p>
+            <p>0953488334 - 0953411334</p>
+            <p><i class="fa-regular fa-clock mr-1" style="font-size: 10px;"></i> {{ now }}</p>
+        </div>
+    </div>
+</body>
+
+</html>

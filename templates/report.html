@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Financial Report - Top Net Pay{% endblock %}
+
+{% block content %}
+{% include 'navbar.html' %}
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-8">
+
+    <!-- Header + Date Filter -->
+    <div class="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold mb-1">{% if session.get('lang', 'ar') == 'ar' %}التقارير المالية{% else %}Financial Reports{% endif %}</h1>
+            <p class="text-slate-400 text-sm">{% if session.get('lang', 'ar') == 'ar' %}ملخص الدخل والمصاريف — والأرباح والخسائر{% else %}Income vs. Expenses — Profit & Loss Summary{% endif %}</p>
+        </div>
+        <form action="{{ url_for('report') }}" method="GET" class="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded-lg border border-slate-700">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-slate-500 text-xs font-bold">From</div>
+                <input type="date" name="start_date" value="{{ start_date }}" required class="bg-slate-900 border border-slate-700 text-[13px] text-white rounded-lg pl-10 p-2 cursor-pointer shadow-inner">
+            </div>
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-slate-500 text-xs font-bold">To</div>
+                <input type="date" name="end_date" value="{{ end_date }}" required class="bg-slate-900 border border-slate-700 text-[13px] text-white rounded-lg pl-7 p-2 cursor-pointer shadow-inner">
+            </div>
+            <button type="submit" class="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0">
+                <i class="fa-solid fa-magnifying-glass mr-1"></i> Filter
+            </button>
+            <button type="submit" formaction="{{ url_for('export_report') }}" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0">
+                <i class="fa-solid fa-file-excel mr-1"></i> Export
+            </button>
+        </form>
+    </div>
+
+    <!-- KPI Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <!-- Total Income -->
+        <div class="glass-panel px-6 py-5 rounded-xl flex items-center justify-between border-l-4 border-emerald-500 shadow-xl">
+            <div>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">
+                    <i class="fa-solid fa-arrow-trend-up mr-1 text-emerald-500/50"></i>
+                    {% if session.get('lang', 'ar') == 'ar' %}إجمالي الدخل{% else %}Total Income{% endif %}
+                </p>
+                <div class="flex flex-col">
+                    <span class="text-xl font-bold text-emerald-400">{{ "{:,.2f}".format(income_total_usd) }} $</span>
+                    <span class="text-lg font-bold text-emerald-500/80">{{ "{:,.0f}".format(income_total_syp) }} ل.س</span>
+                </div>
+                <p class="text-[9px] text-slate-500 mt-1">
+                    {% if session.get('lang', 'ar') == 'ar' %}الاشتراكات + التركيبات{% else %}Subs + Installs{% endif %}
+                </p>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                <i class="fa-solid fa-coins text-emerald-400 text-lg"></i>
+            </div>
+        </div>
+
+        <!-- Installations Revenue -->
+        <div class="glass-panel px-6 py-5 rounded-xl flex items-center justify-between border-l-4 border-blue-500 shadow-xl">
+            <div>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">
+                    <i class="fa-solid fa-screwdriver-wrench mr-1 text-blue-500/50"></i>
+                    {% if session.get('lang', 'ar') == 'ar' %}دخل التركيبات{% else %}Installs Revenue{% endif %}
+                </p>
+                <div class="flex flex-col">
+                    <span class="text-xl font-bold text-blue-400">{{ "{:,.2f}".format(installations_income_usd) }} $</span>
+                    <span class="text-lg font-bold text-blue-500/80">{{ "{:,.0f}".format(installations_income_syp) }} ل.س</span>
+                </div>
+                <p class="text-[9px] text-slate-500 mt-1">
+                    {{ installations_count }} {% if session.get('lang', 'ar') == 'ar' %}عملية مكتملة{% else %}Completed Tasks{% endif %}
+                </p>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                <i class="fa-solid fa-plug-circle-check text-blue-400 text-lg"></i>
+            </div>
+        </div>
+
+        <!-- Total Expenses -->
+        <div class="glass-panel px-6 py-5 rounded-xl flex items-center justify-between border-l-4 border-rose-500 shadow-xl">
+            <div>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">
+                    <i class="fa-solid fa-arrow-trend-down mr-1 text-rose-500/50"></i>
+                    {% if session.get('lang', 'ar') == 'ar' %}إجمالي المصاريف{% else %}Total Expenses{% endif %}
+                </p>
+                <p class="text-xl font-bold text-rose-400">{{ "{:,.0f}".format(expense_total) }} <span class="text-xs font-normal text-rose-500">ل.س</span></p>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
+                <i class="fa-solid fa-file-invoice-dollar text-rose-400 text-lg"></i>
+            </div>
+        </div>
+
+        <!-- Net Profit / Loss -->
+        <div class="glass-panel px-6 py-5 rounded-xl flex items-center justify-between border-l-4 {% if net_profit_syp >= 0 %}border-violet-500{% else %}border-red-600{% endif %} shadow-xl">
+            <div>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">
+                    <i class="fa-solid fa-scale-balanced mr-1 text-violet-500/50"></i>
+                    {% if session.get('lang', 'ar') == 'ar' %}الربح / الخسارة الصافية{% else %}Net Profit / Loss{% endif %}
+                </p>
+                <div class="flex flex-col">
+                    <span class="text-xl font-bold {% if net_profit_usd >= 0 %}text-violet-400{% else %}text-red-400{% endif %}">{{ "{:,.2f}".format(net_profit_usd) }} $</span>
+                    <span class="text-lg font-bold {% if net_profit_syp >= 0 %}text-violet-500{% else %}text-red-500{% endif %}">{{ "{:,.0f}".format(net_profit_syp) }} ل.س</span>
+                </div>
+            </div>
+            <div class="w-10 h-10 rounded-full {% if net_profit_syp >= 0 %}bg-violet-500/10 border border-violet-500/20{% else %}bg-red-500/10 border border-red-500/20{% endif %} flex items-center justify-center">
+                <i class="fa-solid {% if net_profit_syp >= 0 %}fa-chart-line text-violet-400{% else %}fa-triangle-exclamation text-red-400{% endif %} text-lg"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Left Column: Tables -->
+        <div class="lg:col-span-2 space-y-8">
+            <!-- Daily Breakdown Table -->
+            <div class="glass-panel rounded-xl overflow-hidden shadow-xl border border-slate-700/30">
+                <div class="px-6 py-4 border-b border-slate-700/50 bg-slate-800/40 flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-white">
+                        <i class="fa-regular fa-calendar-days mr-2 text-violet-400"></i>
+                        {% if session.get('lang', 'ar') == 'ar' %}التقرير اليومي{% else %}Daily Breakdown{% endif %}
+                    </h2>
+                    <span class="text-[10px] text-slate-500 bg-slate-900 px-2 py-1 rounded-full border border-slate-700">
+                        {{ start_date }} → {{ end_date }}
+                    </span>
+                </div>
+                <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <table class="w-full text-sm text-left text-slate-300">
+                        <thead class="text-[11px] text-slate-400 uppercase bg-slate-800/80 sticky top-0 z-10 border-b border-slate-700">
+                            <tr>
+                                <th class="px-2 sm:px-6 py-4 font-bold tracking-wider">{% if session.get('lang', 'ar') == 'ar' %}التاريخ{% else %}Date{% endif %}</th>
+                                <th class="px-2 sm:px-6 py-4 font-bold tracking-wider text-right text-emerald-400">{% if session.get('lang', 'ar') == 'ar' %}الدخل{% else %}Income{% endif %}</th>
+                                <th class="px-2 sm:px-6 py-4 font-bold tracking-wider text-right text-rose-400">{% if session.get('lang', 'ar') == 'ar' %}المصاريف{% else %}Expenses{% endif %}</th>
+                                <th class="px-2 sm:px-6 py-4 font-bold tracking-wider text-right text-violet-400">{% if session.get('lang', 'ar') == 'ar' %}الصافي{% else %}Net{% endif %}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/50">
+                            {% if daily_rows %}
+                                {% for row in daily_rows %}
+                                <tr class="hover:bg-slate-800/40 transition-colors">
+                                    <td class="px-2 sm:px-6 py-3 whitespace-nowrap font-medium text-white text-[11px] sm:text-sm">{{ row.day[5:] }}</td>
+                                    <td class="px-2 sm:px-6 py-3 whitespace-nowrap text-right text-emerald-400 font-semibold">
+                                        <div class="text-[11px] sm:text-sm">{{ "{:,.0f}".format(row.income_syp) }} <span class="text-[9px]">ل.س</span></div>
+                                        {% if row.income_usd > 0 %}
+                                            <div class="text-[9px] sm:text-[11px] text-emerald-500/70">{{ "{:,.2f}".format(row.income_usd) }} $</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-2 sm:px-6 py-3 whitespace-nowrap text-right text-rose-400 font-semibold text-[11px] sm:text-sm">{{ "{:,.0f}".format(row.expense) }}</td>
+                                    <td class="px-2 sm:px-6 py-3 whitespace-nowrap text-right font-bold">
+                                        <div class="{% if row.net_syp >= 0 %}text-violet-400{% else %}text-red-400{% endif %} text-[11px] sm:text-sm">
+                                            {% if row.net_syp >= 0 %}+{% endif %}{{ "{:,.0f}".format(row.net_syp) }}
+                                        </div>
+                                        {% if row.net_usd > 0 %}
+                                            <div class="text-[9px] sm:text-[11px] text-violet-500/70">+{{ "{:,.2f}".format(row.net_usd) }} $</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                <!-- Totals Row -->
+                                <tr class="bg-slate-800/70 border-t-2 border-slate-600 font-bold text-sm">
+                                    <td class="px-6 py-4 text-white uppercase tracking-wider text-xs">{% if session.get('lang', 'ar') == 'ar' %}الإجمالي{% else %}Grand Total{% endif %}</td>
+                                    <td class="px-6 py-4 text-right">
+                                        <div class="text-emerald-300">{{ "{:,.0f}".format(income_total_syp) }} <span class="text-[10px]">ل.س</span></div>
+                                        <div class="text-emerald-400 text-xs">{{ "{:,.2f}".format(income_total_usd) }} $</div>
+                                    </td>
+                                    <td class="px-6 py-4 text-right text-rose-300">{{ "{:,.0f}".format(expense_total) }} <span class="text-[10px]">ل.س</span></td>
+                                    <td class="px-6 py-4 text-right">
+                                        <div class="{% if net_profit_syp >= 0 %}text-violet-300{% else %}text-red-300{% endif %}">
+                                            {% if net_profit_syp >= 0 %}+{% endif %}{{ "{:,.0f}".format(net_profit_syp) }} <span class="text-[10px]">ل.س</span>
+                                        </div>
+                                        <div class="{% if net_profit_usd >= 0 %}text-violet-400{% else %}text-red-400{% endif %} text-xs">
+                                            {% if net_profit_usd >= 0 %}+{% endif %}{{ "{:,.2f}".format(net_profit_usd) }} $
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr><td colspan="4" class="px-6 py-12 text-center text-slate-500">{% if session.get('lang', 'ar') == 'ar' %}لا توجد بيانات لهذه الفترة{% else %}No data in this period{% endif %}</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Income Breakdown by Profile -->
+            <div class="glass-panel rounded-xl overflow-hidden shadow-xl border border-slate-700/30">
+                <div class="px-6 py-4 border-b border-slate-700/50 bg-slate-800/40">
+                    <h2 class="text-lg font-bold text-white">
+                        <i class="fa-solid fa-list-check mr-2 text-emerald-400"></i>
+                        {% if session.get('lang', 'ar') == 'ar' %}تحليل الاشتراكات حسب الباقة{% else %}Subscription Breakdown by Profile{% endif %}
+                    </h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-300">
+                        <thead class="text-[11px] text-slate-400 uppercase bg-slate-800/80 border-b border-slate-700">
+                            <tr>
+                                <th class="px-6 py-4 font-bold tracking-wider">{% if session.get('lang', 'ar') == 'ar' %}نوع الباقة{% else %}Profile Name{% endif %}</th>
+                                <th class="px-6 py-4 font-bold tracking-wider text-center">{% if session.get('lang', 'ar') == 'ar' %}العدد{% else %}Count{% endif %}</th>
+                                <th class="px-6 py-4 font-bold tracking-wider text-right text-emerald-400">{% if session.get('lang', 'ar') == 'ar' %}إجمالي المبلغ{% else %}Total Amount{% endif %}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/50">
+                            {% if income_by_profile %}
+                                {% for row in income_by_profile %}
+                                <tr class="hover:bg-slate-800/40 transition-colors">
+                                    <td class="px-6 py-3 whitespace-nowrap font-medium text-white">{{ row.profile_name }}</td>
+                                    <td class="px-6 py-3 whitespace-nowrap text-center text-slate-400">{{ row.count }}</td>
+                                    <td class="px-6 py-3 whitespace-nowrap text-right text-emerald-400 font-bold">{{ "{:,.0f}".format(row.total) }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr><td colspan="3" class="px-6 py-8 text-center text-slate-500">{% if session.get('lang', 'ar') == 'ar' %}لا توجد اشتراكات مسجلة{% else %}No subscriptions recorded{% endif %}</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Graphs/Quick Stats -->
+        <div class="lg:col-span-1 space-y-8">
+            <!-- Expenses by Category -->
+            <div class="glass-panel rounded-xl overflow-hidden shadow-xl border border-slate-700/30">
+                <div class="px-6 py-4 border-b border-slate-700/50 bg-slate-800/40">
+                    <h2 class="text-base font-bold text-white">
+                        <i class="fa-solid fa-chart-pie mr-2 text-rose-400"></i>
+                        {% if session.get('lang', 'ar') == 'ar' %}المصاريف حسب التصنيف{% else %}Expenses by Category{% endif %}
+                    </h2>
+                </div>
+                <div class="divide-y divide-slate-700/50">
+                    {% if expense_by_category %}
+                        {% for cat in expense_by_category %}
+                        <div class="px-5 py-4 flex items-center justify-between hover:bg-slate-800/30 transition-colors">
+                            <span class="text-xs text-slate-300 font-medium pr-3">{{ cat.category }}</span>
+                            <span class="text-xs font-bold text-rose-400 shrink-0">{{ "{:,.0f}".format(cat.total) }} ل.س</span>
+                        </div>
+                        {% endfor %}
+                        <div class="px-5 py-3 bg-slate-800/50 flex items-center justify-between border-t border-slate-700">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold">{% if session.get('lang', 'ar') == 'ar' %}الإجمالي{% else %}Total{% endif %}</span>
+                            <span class="text-xs font-bold text-rose-300">{{ "{:,.0f}".format(expense_total) }} ل.س</span>
+                        </div>
+                    {% else %}
+                        <div class="px-6 py-10 text-center text-slate-500 text-sm">
+                            <i class="fa-regular fa-folder-open text-3xl mb-2 block text-slate-600"></i>
+                            {% if session.get('lang', 'ar') == 'ar' %}لا توجد مصاريف مسجلة{% else %}No expenses recorded{% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Revenue Share -->
+            <div class="glass-panel rounded-xl p-6 shadow-xl border border-slate-700/30 bg-gradient-to-br from-slate-800/30 to-slate-900/30">
+                <h3 class="text-sm font-bold text-slate-300 mb-6 flex items-center">
+                    <i class="fa-solid fa-chart-simple mr-2 text-blue-400"></i>
+                    {% if session.get('lang', 'ar') == 'ar' %}توزيع مصادر الدخل{% else %}Revenue Sources{% endif %}
+                </h3>
+                <div class="space-y-6">
+                    <!-- Subs -->
+                    <div>
+                        <div class="flex justify-between text-[11px] font-bold mb-2">
+                            <span class="text-emerald-400 uppercase">{% if session.get('lang', 'ar') == 'ar' %}الاشتراكات{% else %}Subscriptions{% endif %}</span>
+                            <span class="text-slate-400">{{ "{:,.0f}".format(subscriber_income) }} ل.س</span>
+                        </div>
+                        <div class="h-2 bg-slate-700 rounded-full overflow-hidden shadow-inner">
+                            <div class="h-full bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)]" style="width: {{ sub_percent }}%"></div>
+                        </div>
+                    </div>
+                    <!-- Installs -->
+                    <div>
+                        <div class="flex justify-between text-[11px] font-bold mb-2">
+                            <span class="text-blue-400 uppercase">{% if session.get('lang', 'ar') == 'ar' %}التركيبات{% else %}Installations{% endif %}</span>
+                            <span class="text-slate-400">{{ "{:,.0f}".format(installations_income_syp) }} ل.س</span>
+                        </div>
+                        <div class="h-2 bg-slate-700 rounded-full overflow-hidden shadow-inner">
+                            <div class="h-full bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.4)]" style="width: {{ inst_percent }}%"></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Net Summary -->
+                <div class="mt-8 pt-6 border-t border-slate-700/50">
+                    <div class="flex flex-col gap-1 items-end">
+                        <span class="text-xs text-slate-500 font-bold uppercase w-full text-right">{% if session.get('lang', 'ar') == 'ar' %}إجمالي المحصل{% else %}Gross Revenue{% endif %}</span>
+                        <span class="text-lg font-black text-emerald-400 italic tracking-tighter">{{ "{:,.2f}".format(income_total_usd) }} $</span>
+                        <span class="text-base font-black text-white italic tracking-tighter">{{ "{:,.0f}".format(income_total_syp) }} ل.س</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    </div>
+</div>
+{% endblock %}
