@@ -1345,6 +1345,8 @@ def manage_users():
                 conn.commit()
                 flash('User deleted successfully.', 'success')
 
+        return redirect(url_for('manage_users'))
+
     response = fetch_all_users_from_api(session['token'])
     raw_users = response.get('data', [])
     if isinstance(raw_users, dict):
@@ -1534,6 +1536,8 @@ def complaints():
                 flash('✅ تم استلام المهمة بنجاح.', 'success')
             else:
                 flash('🚫 Unauthorized.', 'error')
+
+        return redirect(url_for('complaints'))
 
     # Stats calculation
     stats = {}
@@ -1822,7 +1826,7 @@ def installations():
             payment_notes = request.form.get('payment_notes', '')
             connection_type = request.form.get('connection_type', '')
             dish_ip = request.form.get('dish_ip', '')
-            inst = conn.execute('SELECT fullname, phone1, assigned_to FROM installations WHERE id = ?', (inst_id,)).fetchone()
+            inst = conn.execute('SELECT * FROM installations WHERE id = ?', (inst_id,)).fetchone()
             if inst and (user_role in ['admin', 'manager'] or inst['assigned_to'] == user_name):
                 conn.execute('''
                     UPDATE installations
@@ -1859,6 +1863,8 @@ def installations():
                 flash('✅ تم انهاء التركيب وتسجيل الدفعة.', 'success')
             else:
                 flash('🚫 غير مصرح.', 'error')
+                
+        return redirect(url_for('installations'))
 
     # Filtering
     query = 'SELECT * FROM installations'
