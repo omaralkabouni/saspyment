@@ -121,6 +121,8 @@
                         <th scope="col" class="px-4 py-4 font-semibold tracking-wider">Username</th>
                         <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-amber-200 hidden md:table-cell"><i
                                 class="fa-solid fa-user-tie mr-1"></i> Parent</th>
+                        <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-amber-100 hidden md:table-cell"><i
+                                class="fa-solid fa-key mr-1"></i> Pass</th>
                         <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-blue-400 hidden lg:table-cell"><i
                                 class="fa-solid fa-phone mr-1"></i> Phone</th>
                         <th scope="col" class="px-4 py-4 font-semibold tracking-wider hidden xl:table-cell">Profile</th>
@@ -146,6 +148,11 @@
                                 {{ user.parent_username }}
                             </span>
                             {% else %}-{% endif %}
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap hidden md:table-cell">
+                            <span class="text-amber-100/90 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 text-[10px]">
+                                {{ user.password or '-' }}
+                            </span>
                         </td>
                         <td class="px-4 py-4 whitespace-nowrap hidden lg:table-cell">
                             <span class="text-blue-400 text-[11px] font-mono">

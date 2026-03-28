@@ -28,13 +28,13 @@
 
         .receipt {
             width: 100%;
-            padding: 5mm;
+            padding: 3mm;
             margin: 0 auto;
         }
 
         .header {
             text-align: center;
-            margin-bottom: 5mm;
+            margin-bottom: 3mm;
         }
 
         .logo {
@@ -131,78 +131,78 @@
         <button class="print-btn" onclick="window.print()">طباعة (كاشير)</button>
 
         <div class="header">
-            <img src="/image/LOGO.png" class="logo" alt="Logo">
-            <p class="company-name">Top Net Syria</p>
-            <p style="font-size: 10px; margin: 0;">لخدمات الإنترنت والاتصالات</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2mm;">
+                <div id="qrcode"></div>
+                <img src="/image/LOGO.png" class="logo" alt="Logo" style="max-height: 22mm; width: auto; margin: 0;">
+            </div>
+            <p class="company-name" style="font-size: 13px; margin: 0; text-align: center;">Top Net Syria <span style="font-size: 8px; font-weight: normal;">- لخدمات الإنترنت</span></p>
         </div>
 
-        <div class="divider"></div>
+        <div class="divider" style="margin: 1mm 0;"></div>
 
-        <div class="info-row">
-            <span class="info-label">رقم الفاتورة:</span>
-            <span>#{{ p.id }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label"><i class="fa-regular fa-calendar-days" style="font-size: 14px; color: #000;"></i></span>
-            <span>{{ p.created_at.split(' ')[0] }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label"><i class="fa-regular fa-clock" style="font-size: 14px; color: #000;"></i></span>
-            <span>{{ p.created_at.split(' ')[1] if ' ' in p.created_at else '' }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">الموظف:</span>
-            <span>{{ p.admin_name }}</span>
+        <div style="font-size: 10px; line-height: 1.2;">
+            <div class="info-row">
+                <span><b>فاتورة:</b> #{{ p.id }}</span>
+                <span>{{ p.created_at[2:16] }}</span>
+            </div>
+            <div class="info-row">
+                <span><b>الموظف:</b> {{ p.admin_name }}</span>
+                <span><b>المشترك:</b> {{ p.username }}</span>
+            </div>
+            {% if p.fullname and p.fullname != p.username %}
+            <div class="info-row" style="font-size: 9px; opacity: 0.8;">
+                <span>{{ p.fullname }}</span>
+            </div>
+            {% endif %}
         </div>
 
-        <div class="divider"></div>
-
-        <div class="info-row">
-            <span class="info-label">المشترك:</span>
-            <span>{{ p.fullname or p.username }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">المستخدم:</span>
-            <span>{{ p.username }}</span>
-        </div>
-        {% if p.phone %}
-        <div class="info-row">
-            <span class="info-label">رقم الهاتف:</span>
-            <span>{{ p.phone }}</span>
-        </div>
-        {% endif %}
-
-        <table class="items-table">
-            <thead>
+        <table class="items-table" style="margin: 1mm 0;">
+            <thead style="font-size: 10px;">
                 <tr>
-                    <th>الوصف</th>
-                    <th style="text-align: left;">المبلغ</th>
+                    <th style="padding: 0.5mm 0;">الوصف</th>
+                    <th style="text-align: left; padding: 0.5mm 0;">المبلغ</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody style="font-size: 11px;">
                 <tr>
-                    <td>شحن رصيد ({{ p.profile_name }}) - شهر {{ p.created_at[5:7] }}</td>
-                    <td style="text-align: left;">{{ p.amount }}</td>
+                    <td style="padding: 1mm 0;">شحن: {{ p.profile_name }} ({{ p.created_at[5:7] }})</td>
+                    <td style="text-align: left; padding: 1mm 0;">
+                        <div style="font-size: 11px;">{{ "{:,.0f}".format(p.amount) }} <small>(قديمة)</small></div>
+                        <div style="font-size: 10px; color: #444;">{{ "{:,.0f}".format(p.amount / 100) }} <small>(جديدة)</small></div>
+                    </td>
                 </tr>
             </tbody>
         </table>
 
-        <div class="total-section">
-            المجموع: {{ p.amount }} ل.س
+        <div class="total-section" style="margin-top: 1mm; padding: 1mm; font-size: 14px;">
+            <div>المجموع (قديمة): {{ "{:,.0f}".format(p.amount) }} ل.س</div>
+            <div style="font-size: 11px; opacity: 0.8;">المجموع (جديدة): {{ "{:,.0f}".format(p.amount / 100) }} ل.س</div>
             {% if p.amount == 0 %}
-                <div style="color: red; font-size: 14px; margin-top: 5px;">(غير مدفوع)</div>
+                <span style="color: red; font-size: 11px;"> (غير مدفوع)</span>
             {% else %}
-                <div style="color: green; font-size: 14px; margin-top: 5px;">(تم الدفع)</div>
+                <span style="color: green; font-size: 11px;"> (تم الدفع)</span>
             {% endif %}
         </div>
 
-        <div class="footer">
-            <p>شكراً لتعاملكم معنا</p>
-            <p>Top Net Syria - سوريا-دمشق</p>
-            <p>0953488334 - 0953411334</p>
-            <p><i class="fa-regular fa-clock mr-1" style="font-size: 10px;"></i> {{ now }}</p>
+        <div class="footer" style="margin-top: 2mm; border-top: 1px dashed #ccc; padding-top: 2mm;">
+            <p style="margin: 1px 0; font-weight: bold;">شكراً لتعاملكم معنا - Top Net Syria</p>
+            <p style="margin: 1px 0;">دمشق | 0953488334 - 0953411334</p>
+            <p style="margin: 1px 0; font-size: 8px;">{{ now }}</p>
+            <p style="margin: 2px 0; font-size: 9px; font-weight: bold; border-top: 1px dotted #eee; padding-top: 1mm;">القابوني غروب محدودة المسؤولية</p>
         </div>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        var publicUrl = window.location.origin + "/v/{{ p.public_token }}";
+        new QRCode(document.getElementById("qrcode"), {
+            text: publicUrl,
+            width: 80,
+            height: 80,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+    </script>
 </body>
 
 </html>

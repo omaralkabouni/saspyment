@@ -12,6 +12,7 @@ import json
 import aes
 import requests
 import threading
+import uuid
 from typing import Any
 
 app = Flask(__name__)
@@ -31,7 +32,8 @@ def manifest():
 
 # Initialize the SAS API client with the user's server IP
 SAS_API_IP = os.getenv('SAS_API_IP', '193.43.140.218')
-sasclient = SasAPI(f"https://{SAS_API_IP}")
+sasclient = SasAPI(f"https://{SAS_API_IP}", portal='admin')
+subscriber_client = SasAPI(f"https://{SAS_API_IP}", portal='user')
 
 # Webhook for n8n/WhatsApp (Set this in environment variables)
 WEBHOOK_URL = os.getenv('WEBHOOK_URL', '')
@@ -73,6 +75,7 @@ def init_db():
             amount REAL NOT NULL,
             admin_name TEXT NOT NULL,
             phone TEXT, 
+            public_token TEXT UNIQUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -82,6 +85,38 @@ def init_db():
         c.execute("ALTER TABLE payments_v3 ADD COLUMN phone TEXT")
     except sqlite3.OperationalError:
         pass # Already exists
+
+    # Migration: Add public_token column if it doesn't exist
+    try:
+        c.execute("ALTER TABLE payments_v3 ADD COLUMN public_token TEXT")
+    except sqlite3.OperationalError:
+        pass # Already exists
+
+    # Migration: Add unique index for public_token
+    try:
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_token ON payments_v3(public_token)")
+    except sqlite3.OperationalError:
+        pass
+
+    # Migration: Add public_token to installations if it doesn't exist
+    try:
+        c.execute("ALTER TABLE installations ADD COLUMN public_token TEXT")
+    except sqlite3.OperationalError:
+        pass 
+
+    # Migration: Populate missing public_tokens for payments
+    rows = c.execute("SELECT id FROM payments_v3 WHERE public_token IS NULL").fetchall()
+    for row in rows:
+        token = str(uuid.uuid4())
+        c.execute("UPDATE payments_v3 SET public_token = ? WHERE id = ?", (token, row[0]))
+
+    # Migration: Populate missing public_tokens for installations
+    rows = c.execute("SELECT id FROM installations WHERE public_token IS NULL").fetchall()
+    for row in rows:
+        token = str(uuid.uuid4())
+        c.execute("UPDATE installations SET public_token = ? WHERE id = ?", (token, row[0]))
+    
+    conn.commit()
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS settings (
@@ -111,6 +146,23 @@ def init_db():
     ]
     for key, val in toggles:
         c.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, val))
+    
+    # New Table for Local Subscriber Login
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS subscribers (
+            username TEXT PRIMARY KEY,
+            password TEXT,
+            firstname TEXT,
+            lastname TEXT,
+            mobile TEXT,
+            profile TEXT,
+            expiration TEXT,
+            status INTEGER,
+            parent_username TEXT,
+            json_data TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -243,6 +295,7 @@ def init_db():
             dish_ip TEXT,
             payment_amount_usd REAL DEFAULT 0,
             payment_amount_syp REAL DEFAULT 0,
+            public_token TEXT UNIQUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -259,6 +312,18 @@ def init_db():
             json_data TEXT,
             total INTEGER,
             updated_at REAL
+        )
+    ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS landing_packages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            speed TEXT,
+            price_syp TEXT,
+            price_usd TEXT,
+            description TEXT,
+            is_active INTEGER DEFAULT 1
         )
     ''')
 
@@ -309,9 +374,13 @@ def fetch_all_users_from_api(token, force_refresh=False) -> dict[str, Any]:
                 "sortBy": "username",
                 "direction": "asc",
                 "search": "",
+                "show_password": 1,
+                "show_passwords": 1,      # Alternative flag
+                "plain_password": 1,      # Another common one
+                "with_password": 1,       # Version specific
             }
             encrypted_payload = aes.encrypt(json.dumps(payload_dict))
-            print(f"DEBUG: Triggering SAS API fetch for 'index/user'...")
+            print(f"DEBUG: Triggering SAS API fetch for 'index/user' with extended password flags...")
             response = sasclient.post(token_inner, 'index/user', encrypted_payload)
             
             if isinstance(response, dict) and 'data' in response:
@@ -326,12 +395,40 @@ def fetch_all_users_from_api(token, force_refresh=False) -> dict[str, Any]:
                 # Save to DB asynchronously inside the background task
                 try:
                     conn = sqlite3.connect(DB_PATH)
+                    # 1. Update the global cache blob
                     json_str = json.dumps(users)
                     conn.execute("INSERT OR REPLACE INTO sas_cache (id, json_data, total, updated_at) VALUES (1, ?, ?, ?)", (json_str, total, ts))
+                    
+                    # 2. Update the individual subscribers table for local login
+                    for u in users:
+                        # Try to find password in multiple possible fields
+                        pwd = (u.get('password') or 
+                               u.get('plain_password') or 
+                               u.get('user_password') or 
+                               u.get('details', {}).get('password') if isinstance(u.get('details'), dict) else '')
+                        
+                        conn.execute('''
+                            INSERT OR REPLACE INTO subscribers 
+                            (username, password, firstname, lastname, mobile, profile, expiration, status, parent_username, json_data, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            u.get('username'),
+                            pwd,
+                            u.get('firstname'),
+                            u.get('lastname'),
+                            u.get('mobile') or u.get('phone'),
+                            u.get('profile_details', {}).get('name') if isinstance(u.get('profile_details'), dict) else '',
+                            u.get('expiration'),
+                            1 if (isinstance(u.get('status'), dict) and u.get('status').get('status')) else 0,
+                            u.get('parent_username'),
+                            json.dumps(u),
+                            ts
+                        ))
+                    
                     conn.commit()
                     conn.close()
                 except Exception as e:
-                    print(f"DEBUG: Failed to save to sas_cache DB: {e}")
+                    print(f"DEBUG: Failed to save to local DB: {e}")
                     
                 print(f"DEBUG: SAS API Success! Fetched {len(users)} users. Total: {total}")
             else:
@@ -350,11 +447,11 @@ def fetch_all_users_from_api(token, force_refresh=False) -> dict[str, Any]:
         threading.Thread(target=background_refresh, args=(token,), daemon=True).start()
         return {'data': USER_CACHE['data'], 'total': USER_CACHE['total'], 'status': 'cached_stale', 'timestamp': USER_CACHE['timestamp']}
 
-def send_webhook_async(data, webhook_type='payments', event_name=None):
+def send_webhook_async(data, webhook_type='payments', event_name=None, base_url=None):
     """Wrapper to run send_webhook in a background thread."""
-    threading.Thread(target=send_webhook, args=(data, None, webhook_type, event_name), daemon=True).start()
+    threading.Thread(target=send_webhook, args=(data, None, webhook_type, event_name, base_url), daemon=True).start()
 
-def send_webhook(data, webhook_url_override=None, webhook_type='payments', event_name=None):
+def send_webhook(data, webhook_url_override=None, webhook_type='payments', event_name=None, base_url=None):
     """Send data to n8n webhook for WhatsApp notifications."""
     conn = get_db_connection()
     
@@ -389,6 +486,10 @@ def send_webhook(data, webhook_url_override=None, webhook_type='payments', event
     try:
         # Prepare a clean dictionary for the webhook based on type
         if webhook_type == 'payments':
+            public_token = data.get('public_token', '')
+            public_url = f"{base_url}v/{public_token}" if (base_url and public_token) else ""
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={public_url}" if public_url else ""
+            
             payload = {
                 "id": data.get('id', 'test_id'),
                 "invoice_no": f"SAS-{data.get('id', '0000')}",
@@ -398,7 +499,9 @@ def send_webhook(data, webhook_url_override=None, webhook_type='payments', event
                 "amount": data.get('amount', '0'),
                 "phone": data.get('phone', '0900000000'),
                 "admin_name": data.get('admin_name', 'Admin'),
-                "message": f"✅ تم استلام دفعة بقيمة {data.get('amount', '0')} ل.س للحساب {data.get('username', '')}. شكراً لتعاملكم معنا (TopNet).",
+                "public_invoice_url": public_url,
+                "qr_code_url": qr_url,
+                "message": f"✅ تم استلام دفعة بقيمة {data.get('amount', '0')} ل.س للحساب {data.get('username', '')}. شكراً لتعاملكم معنا (TopNet). \nرابط الفاتورة: {public_url}",
                 "date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 "status": data.get('status', "paid"),
                 "event": event_name or "new_payment"
@@ -446,6 +549,12 @@ def send_webhook(data, webhook_url_override=None, webhook_type='payments', event
             else:
                 msg = f"⚠️ طلب تركيب جديد: باسم {data.get('fullname', '')}. للتحقق والمتابعة."
                 
+                qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={public_url}" if public_url else ""
+
+            public_token = data.get('public_token', '')
+            public_url = f"{base_url}vi/{public_token}" if (base_url and public_token) else ""
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={public_url}" if public_url else ""
+                
             payload = {
                 "id": data.get('id', 'test_id'),
                 "fullname": data.get('fullname', 'Test User'),
@@ -456,12 +565,14 @@ def send_webhook(data, webhook_url_override=None, webhook_type='payments', event
                 "area": data.get('area', ''),
                 "address": data.get('address', ''),
                 "notes": data.get('notes', ''),
+                "public_invoice_url": public_url,
+                "qr_code_url": qr_url,
                 "amount_usd": data.get('amount_usd', '0'),
                 "amount_syp": data.get('amount_syp', '0'),
                 "connection": data.get('connection_type', ''),
                 "dish_ip": data.get('dish_ip', ''),
                 "status": data.get('status', 'Pending'),
-                "message": msg,
+                "message": f"{msg} \nرابط التفاصيل: {public_url}",
                 "date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 "event": event
             }
@@ -493,7 +604,11 @@ def force_sync():
 def serve_image(filename):
     return send_from_directory('image', filename)
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/')
+def landing():
+    return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'token' in session:
         return redirect(url_for('dashboard'))
@@ -516,7 +631,7 @@ def login():
         
         if local_user:
             # For local users, we use the background SAS account to get a valid token
-            token = sasclient.login(username='Top', password='omar@123')
+            token, error_msg = sasclient.login(username='Top', password='omar@123')
             if token:
                 session['token'] = token
                 session['username'] = username
@@ -526,11 +641,11 @@ def login():
                     return redirect(url_for('complaints'))
                 return redirect(url_for('dashboard'))
             else:
-                flash('🚨 SAS API Connection Error. Local login failed because SAS is unreachable.', 'error')
+                flash(f'🚨 SAS API Connection Error: {error_msg or "Local login failed because SAS is unreachable."}', 'error')
                 return redirect(url_for('login'))
 
         # 2. If not in local db, check SAS API directly
-        token = sasclient.login(username=auth_username, password=auth_password)
+        token, error_msg = sasclient.login(username=auth_username, password=auth_password)
         if token:
             session['token'] = token
             session['username'] = username 
@@ -675,13 +790,14 @@ def payments():
         admin_name = session.get('username', 'Unknown')
         
         if username and amount:
+            public_token = str(uuid.uuid4())
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO payments_v3 
-                (username, fullname, profile_name, parent, amount, admin_name, phone) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (username, fullname, profile_name, parent, amount, admin_name, phone))
+                (username, fullname, profile_name, parent, amount, admin_name, phone, public_token) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (username, fullname, profile_name, parent, amount, admin_name, phone, public_token))
             payment_id = cursor.lastrowid
             conn.commit()
             conn.close()
@@ -695,8 +811,9 @@ def payments():
                 'parent': parent,
                 'amount': amount,
                 'phone': phone,
-                'admin_name': admin_name
-            }, webhook_type='payments', event_name='new')
+                'admin_name': admin_name,
+                'public_token': public_token
+            }, webhook_type='payments', event_name='new', base_url=request.host_url)
             
             flash(f'Successfully registered payment of {amount} ل.س for {username}.', 'success')
             return redirect(url_for('payments'))
@@ -1226,6 +1343,34 @@ def print_invoice(p_id):
         
     return render_template('invoice.html', p=payment, now=datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
+@app.route('/v/<token>')
+def public_invoice(token):
+    conn = get_db_connection()
+    # Fetch payment
+    p = conn.execute('SELECT * FROM payments_v3 WHERE public_token = ?', (token,)).fetchone()
+    
+    if not p:
+        conn.close()
+        return "Invoice not found or invalid link.", 404
+        
+    # Fetch subscriber info if available locally for extra details
+    sub = conn.execute('SELECT * FROM subscribers WHERE username = ?', (p['username'],)).fetchone()
+    conn.close()
+    
+    # We use a special public template for cleaner view
+    return render_template('public_invoice.html', p=p, sub=sub)
+
+@app.route('/vi/<token>')
+def public_installation(token):
+    conn = get_db_connection()
+    p = conn.execute('SELECT * FROM installations WHERE public_token = ?', (token,)).fetchone()
+    conn.close()
+    
+    if not p:
+        return "Installation record not found or invalid link.", 404
+        
+    return render_template('public_installation.html', p=p)
+
 @app.route('/report/export')
 def export_report():
     if 'token' not in session: return redirect(url_for('login'))
@@ -1419,7 +1564,7 @@ def complaints():
                     'area': area,
                     'text': text,
                     'assigned': assigned
-                }, webhook_type='complaints', event_name='new')
+                }, webhook_type='complaints', event_name='new', base_url=request.host_url)
 
                 flash('✅ تم تسجيل الشكوى بنجاح.', 'success')
             else:
@@ -1473,7 +1618,7 @@ def complaints():
                                 'employee_phone': emp['phone'] or emp['maintenance_id'] or '',
                                 'event': 'assign',
                                 'status': new_status
-                            }, webhook_type='complaints', event_name='assign')
+                            }, webhook_type='complaints', event_name='assign', base_url=request.host_url)
 
             # Record the log entry
             conn.execute('''
@@ -1500,14 +1645,14 @@ def complaints():
                     'username': current_complaint['username'] if current_complaint else '',
                     'notes': notes,
                     'status': new_status
-                }, webhook_type='complaints', event_name='resolve')
+                }, webhook_type='complaints', event_name='resolve', base_url=request.host_url)
             elif not assigned_changed:
                 send_webhook_async({
                     'id': c_id,
                     'username': current_complaint['username'] if current_complaint else '',
                     'notes': notes,
                     'status': new_status
-                }, webhook_type='complaints', event_name='update')
+                }, webhook_type='complaints', event_name='update', base_url=request.host_url)
             
             flash('✅ تم تحديث الشكوى بنجاح.', 'success')
 
@@ -1708,10 +1853,11 @@ def installations():
             notes = request.form.get('notes', '')
             user_parent = session.get('parent', '')
             if fullname and phone1:
+                public_token = str(uuid.uuid4())
                 conn.execute('''
-                    INSERT INTO installations (fullname, phone1, phone2, area, address_details, notes, registered_by, parent)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (fullname, phone1, phone2, area, address, notes, user_name, user_parent))
+                    INSERT INTO installations (fullname, phone1, phone2, area, address_details, notes, registered_by, parent, public_token)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (fullname, phone1, phone2, area, address, notes, user_name, user_parent, public_token))
                 conn.commit()
                 
                 # Send Webhook Notification for Installation Request
@@ -1722,8 +1868,9 @@ def installations():
                     'phone': phone1,
                     'area': area,
                     'address': address,
-                    'notes': notes
-                }, webhook_type='installations')
+                    'notes': notes,
+                    'public_token': public_token
+                }, webhook_type='installations', base_url=request.host_url)
 
                 flash('✅ تم تسجيل طلب التركيب بنجاح.', 'success')
             else:
@@ -1749,15 +1896,11 @@ def installations():
                     send_webhook_async({
                         'id': inst_id,
                         'type': 'installation_assigned',
-                        'fullname': inst['fullname'],
-                        'phone': inst['phone1'],
-                        'area': inst['area'],
-                        'address': inst['address_details'],
-                        'notes': inst['notes'],
                         'employee_name': emp['username'],
                         'employee_phone': emp['phone'] or emp['maintenance_id'] or '',
-                        'status': 'Assigned'
-                    }, webhook_type='installations', event_name='assign')
+                        'status': 'Assigned',
+                        'public_token': inst['public_token']
+                    }, webhook_type='installations', event_name='assign', base_url=request.host_url)
                     
                 flash('✅ تم تعيين مهمة التركيب بنجاح.', 'success')
 
@@ -1803,15 +1946,11 @@ def installations():
                         send_webhook_async({
                             'id': inst_id,
                             'type': 'installation_updated',
-                            'fullname': inst['fullname'],
-                            'phone': inst['phone1'],
-                            'area': inst['area'],
-                            'address': inst['address_details'],
-                            'notes': inst['notes'],
                             'employee_name': emp['username'] if emp else '',
                             'employee_phone': emp['phone'] or emp['maintenance_id'] or '' if emp else '',
-                            'status': inst['status']
-                        }, webhook_type='installations', event_name='update')
+                            'status': inst['status'],
+                            'public_token': inst['public_token']
+                        }, webhook_type='installations', event_name='update', base_url=request.host_url)
                         
                     flash('✅ تم تحديث بيانات طلب التركيب.', 'success')
                 else:
@@ -1846,19 +1985,10 @@ def installations():
                 send_webhook_async({
                     'id': inst_id,
                     'type': 'installation_completed',
-                    'fullname': inst['fullname'],
-                    'phone': inst['phone1'],
-                    'area': inst['area'],
-                    'address': inst['address_details'],
-                    'employee_name': emp['username'] if emp else '',
-                    'employee_phone': emp['phone'] or emp['maintenance_id'] or '' if emp else '',
-                    'status': 'Completed',
-                    'amount_usd': payment_amount_usd,
-                    'amount_syp': payment_amount_syp,
-                    'notes': payment_notes,
                     'connection_type': connection_type,
-                    'dish_ip': dish_ip
-                }, webhook_type='installations', event_name='complete')
+                    'dish_ip': dish_ip,
+                    'public_token': inst['public_token']
+                }, webhook_type='installations', event_name='complete', base_url=request.host_url)
 
                 flash('✅ تم انهاء التركيب وتسجيل الدفعة.', 'success')
             else:
@@ -1931,6 +2061,171 @@ def export_installations():
     return Response(csv_data, mimetype='text/csv', headers={'Content-Disposition': f'attachment;filename={filename}'})
 
 
+
+@app.route('/admin/packages')
+def manage_packages():
+    if 'token' not in session or session.get('role') not in ['admin', 'manager']:
+        return redirect(url_for('login'))
+    conn = get_db_connection()
+    rows = conn.execute('SELECT * FROM landing_packages').fetchall()
+    packages = [dict(row) for row in rows]
+    conn.close()
+    return render_template('admin_packages.html', packages=packages)
+
+@app.route('/admin/packages/add', methods=['POST'])
+def add_package():
+    if 'token' not in session or session.get('role') not in ['admin', 'manager']:
+        return redirect(url_for('login'))
+    name = request.form.get('name')
+    speed = request.form.get('speed')
+    price_syp = request.form.get('price_syp')
+    price_usd = request.form.get('price_usd')
+    description = request.form.get('description')
+    
+    conn = get_db_connection()
+    conn.execute('INSERT INTO landing_packages (name, speed, price_syp, price_usd, description) VALUES (?, ?, ?, ?, ?)',
+                 (name, speed, price_syp, price_usd, description))
+    conn.commit()
+    conn.close()
+    flash('✅ Package added successfully.', 'success')
+    return redirect(url_for('manage_packages'))
+
+@app.route('/admin/packages/edit/<int:pkg_id>', methods=['POST'])
+def edit_package(pkg_id):
+    if 'token' not in session or session.get('role') not in ['admin', 'manager']:
+        return redirect(url_for('login'))
+    name = request.form.get('name')
+    speed = request.form.get('speed')
+    price_syp = request.form.get('price_syp')
+    price_usd = request.form.get('price_usd')
+    description = request.form.get('description')
+    is_active = 1 if request.form.get('is_active') == 'on' else 0
+    
+    conn = get_db_connection()
+    conn.execute('UPDATE landing_packages SET name=?, speed=?, price_syp=?, price_usd=?, description=?, is_active=? WHERE id=?',
+                 (name, speed, price_syp, price_usd, description, is_active, pkg_id))
+    conn.commit()
+    conn.close()
+    flash('✅ Package updated successfully.', 'success')
+    return redirect(url_for('manage_packages'))
+
+@app.route('/admin/packages/delete/<int:pkg_id>')
+def delete_package(pkg_id):
+    if 'token' not in session or session.get('role') not in ['admin', 'manager']:
+        return redirect(url_for('login'))
+    conn = get_db_connection()
+    conn.execute('DELETE FROM landing_packages WHERE id=?', (pkg_id,))
+    conn.commit()
+    conn.close()
+    flash('🗑️ Package deleted successfully.', 'success')
+    return redirect(url_for('manage_packages'))
+
+@app.route('/client/login', methods=['POST'])
+def client_login():
+    username = request.form.get('username')
+    password = request.form.get('password')
+    
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    user = conn.execute('SELECT * FROM subscribers WHERE username = ?', (username,)).fetchone()
+    conn.close()
+    
+    if user:
+        if user['password'] == password:
+            session['username'] = username
+            session['is_client'] = True
+            flash(f'👋 أهلاً بك {user["firstname"] or username}', 'success')
+            return redirect(url_for('client_portal'))
+        else:
+            flash('❌ كلمة المرور غير صحيحة.', 'error')
+    else:
+        flash('❌ اسم المستخدم غير موجود محلياً. يرجى التواصل مع الإدارة للمزامنة.', 'error')
+        
+    return redirect(url_for('landing'))
+
+    username = session['username']
+    
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    user = conn.execute('SELECT * FROM subscribers WHERE username = ?', (username,)).fetchone()
+    conn.close()
+    
+    if not user:
+        flash('⚠️ لم يتم العثور على بياناتك محلياً.', 'warning')
+        return redirect(url_for('landing'))
+    
+    # Load details from the cached JSON blob
+    try:
+        details = json.loads(user['json_data'] or '{}')
+    except:
+        details = dict(user)
+    
+    return render_template('client_portal.html', details=details)
+
+@app.route('/debug')
+def debug_portal():
+    # Collect attempts from both clients
+    all_attempts = []
+    for att in subscriber_client.attempts:
+        all_attempts.append({'portal': 'Subscriber/User', **att})
+    for att in sasclient.attempts:
+        all_attempts.append({'portal': 'Admin/Manager', **att})
+    
+    html = """
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <title>SAS Debug Portal</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+        <style>body { font-family: 'Cairo', sans-serif; background: #0f172a; color: white; }</style>
+    </head>
+    <body class="p-8">
+        <div class="max-w-5xl mx-auto">
+            <h1 class="text-3xl font-bold mb-8 text-blue-400">سجل محاولات الاتصال بالسيرفر (Debug)</h1>
+            <p class="mb-6 text-slate-400">هذه الصفحة تظهر لك الروابط التي جربها البرنامج والنتيجة القادمة من السيرفر.</p>
+            
+            <div class="overflow-hidden rounded-xl border border-white/10 bg-slate-900 shadow-2xl">
+                <table class="w-full text-right">
+                    <thead>
+                        <tr class="bg-slate-800 text-slate-300 text-sm">
+                            <th class="p-4 text-sm font-bold">البوابة</th>
+                            <th class="p-4 text-sm font-bold">الرابط المجرب (URL)</th>
+                            <th class="p-4 text-sm font-bold">الحالة (Status)</th>
+                            <th class="p-4 text-sm font-bold">محتوى الرد (Response Sample)</th>
+                            <th class="p-4 text-sm font-bold">تفاصيل الخطأ</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5">
+                        """
+    for att in all_attempts:
+        status_color = "text-emerald-400" if att['status'] == 200 else "text-red-400"
+        html += f"""
+                        <tr class="hover:bg-white/5 transition-colors">
+                            <td class="p-4 font-bold">{att['portal']}</td>
+                            <td class="p-4 font-mono text-[10px] text-slate-300">{att['url']}</td>
+                            <td class="p-4 font-bold {status_color}">{att['status']}</td>
+                            <td class="p-4 font-mono text-[10px] text-slate-400 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap">{att.get('resp_sample', '-')}</td>
+                            <td class="p-4 text-xs text-slate-500">{att.get('error_detail', att.get('msg', '-'))}</td>
+                        </tr>
+        """
+    
+    if not all_attempts:
+        html += """<tr><td colspan="4" class="p-20 text-center text-slate-500">لا توجد محاولات مسجلة بعد. حاول تسجيل الدخول أولاً.</td></tr>"""
+        
+    html += """
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-8 flex justify-center">
+                <a href="/" class="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold transition-all">العودة للرئيسية</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return html
 
 @app.route('/logout')
 def logout():

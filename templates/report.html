@@ -42,7 +42,8 @@
                 </p>
                 <div class="flex flex-col">
                     <span class="text-xl font-bold text-emerald-400">{{ "{:,.2f}".format(income_total_usd) }} $</span>
-                    <span class="text-lg font-bold text-emerald-500/80">{{ "{:,.0f}".format(income_total_syp) }} ل.س</span>
+                    <span class="text-lg font-bold text-emerald-500/80">{{ "{:,.0f}".format(income_total_syp) }} <small class="text-[9px] opacity-60">قديمة</small></span>
+                    <span class="text-md font-bold text-blue-400">{{ "{:,.0f}".format(income_total_syp / 100) }} <small class="text-[9px] opacity-60">جديدة</small></span>
                 </div>
                 <p class="text-[9px] text-slate-500 mt-1">
                     {% if session.get('lang', 'ar') == 'ar' %}الاشتراكات + التركيبات{% else %}Subs + Installs{% endif %}
@@ -62,7 +63,8 @@
                 </p>
                 <div class="flex flex-col">
                     <span class="text-xl font-bold text-blue-400">{{ "{:,.2f}".format(installations_income_usd) }} $</span>
-                    <span class="text-lg font-bold text-blue-500/80">{{ "{:,.0f}".format(installations_income_syp) }} ل.س</span>
+                    <span class="text-lg font-bold text-blue-500/80">{{ "{:,.0f}".format(installations_income_syp) }} <small class="text-[9px] opacity-60">قديمة</small></span>
+                    <span class="text-md font-bold text-emerald-400">{{ "{:,.0f}".format(installations_income_syp / 100) }} <small class="text-[9px] opacity-60">جديدة</small></span>
                 </div>
                 <p class="text-[9px] text-slate-500 mt-1">
                     {{ installations_count }} {% if session.get('lang', 'ar') == 'ar' %}عملية مكتملة{% else %}Completed Tasks{% endif %}
@@ -80,7 +82,10 @@
                     <i class="fa-solid fa-arrow-trend-down mr-1 text-rose-500/50"></i>
                     {% if session.get('lang', 'ar') == 'ar' %}إجمالي المصاريف{% else %}Total Expenses{% endif %}
                 </p>
-                <p class="text-xl font-bold text-rose-400">{{ "{:,.0f}".format(expense_total) }} <span class="text-xs font-normal text-rose-500">ل.س</span></p>
+                <div class="flex flex-col">
+                    <span class="text-xl font-bold text-rose-400">{{ "{:,.0f}".format(expense_total) }} <small class="text-[10px] opacity-60">قديمة</small></span>
+                    <span class="text-lg font-bold text-rose-300">{{ "{:,.0f}".format(expense_total / 100) }} <small class="text-[10px] opacity-60">جديدة</small></span>
+                </div>
             </div>
             <div class="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
                 <i class="fa-solid fa-file-invoice-dollar text-rose-400 text-lg"></i>
@@ -96,7 +101,8 @@
                 </p>
                 <div class="flex flex-col">
                     <span class="text-xl font-bold {% if net_profit_usd >= 0 %}text-violet-400{% else %}text-red-400{% endif %}">{{ "{:,.2f}".format(net_profit_usd) }} $</span>
-                    <span class="text-lg font-bold {% if net_profit_syp >= 0 %}text-violet-500{% else %}text-red-500{% endif %}">{{ "{:,.0f}".format(net_profit_syp) }} ل.س</span>
+                    <span class="text-lg font-bold {% if net_profit_syp >= 0 %}text-violet-500{% else %}text-red-500{% endif %}">{{ "{:,.0f}".format(net_profit_syp) }} <small class="text-[9px] opacity-60">قديمة</small></span>
+                    <span class="text-md font-bold text-blue-400">{{ "{:,.0f}".format(net_profit_syp / 100) }} <small class="text-[9px] opacity-60">جديدة</small></span>
                 </div>
             </div>
             <div class="w-10 h-10 rounded-full {% if net_profit_syp >= 0 %}bg-violet-500/10 border border-violet-500/20{% else %}bg-red-500/10 border border-red-500/20{% endif %} flex items-center justify-center">
@@ -135,19 +141,26 @@
                                 {% for row in daily_rows %}
                                 <tr class="hover:bg-slate-800/40 transition-colors">
                                     <td class="px-2 sm:px-6 py-3 whitespace-nowrap font-medium text-white text-[11px] sm:text-sm">{{ row.day[5:] }}</td>
-                                    <td class="px-2 sm:px-6 py-3 whitespace-nowrap text-right text-emerald-400 font-semibold">
-                                        <div class="text-[11px] sm:text-sm">{{ "{:,.0f}".format(row.income_syp) }} <span class="text-[9px]">ل.س</span></div>
+                                    <td class="px-2 sm:px-6 py-3 whitespace-nowrap text-right font-semibold">
+                                        <div class="text-[10px] sm:text-[12px] text-emerald-400">{{ "{:,.0f}".format(row.income_syp) }} <span class="text-[8px]">قديمة</span></div>
+                                        <div class="text-[10px] sm:text-[12px] text-blue-400">{{ "{:,.0f}".format(row.income_syp / 100) }} <span class="text-[8px]">جديدة</span></div>
                                         {% if row.income_usd > 0 %}
-                                            <div class="text-[9px] sm:text-[11px] text-emerald-500/70">{{ "{:,.2f}".format(row.income_usd) }} $</div>
+                                            <div class="text-[9px] sm:text-[10px] text-emerald-500/70">{{ "{:,.2f}".format(row.income_usd) }} $</div>
                                         {% endif %}
                                     </td>
-                                    <td class="px-2 sm:px-6 py-3 whitespace-nowrap text-right text-rose-400 font-semibold text-[11px] sm:text-sm">{{ "{:,.0f}".format(row.expense) }}</td>
+                                    <td class="px-2 sm:px-6 py-3 whitespace-nowrap text-right text-rose-400 font-semibold">
+                                        <div class="text-[10px] sm:text-[12px]">{{ "{:,.0f}".format(row.expense) }} <span class="text-[8px]">قديمة</span></div>
+                                        <div class="text-[10px] sm:text-[12px] text-rose-300">{{ "{:,.0f}".format(row.expense / 100) }} <span class="text-[8px]">جديدة</span></div>
+                                    </td>
                                     <td class="px-2 sm:px-6 py-3 whitespace-nowrap text-right font-bold">
-                                        <div class="{% if row.net_syp >= 0 %}text-violet-400{% else %}text-red-400{% endif %} text-[11px] sm:text-sm">
-                                            {% if row.net_syp >= 0 %}+{% endif %}{{ "{:,.0f}".format(row.net_syp) }}
+                                        <div class="{% if row.net_syp >= 0 %}text-violet-400{% else %}text-red-400{% endif %} text-[9px] sm:text-[11px]">
+                                            {% if row.net_syp >= 0 %}+{% endif %}{{ "{:,.0f}".format(row.net_syp) }} <span class="text-[8px]">قديمة</span>
+                                        </div>
+                                        <div class="text-blue-400 text-[9px] sm:text-[11px]">
+                                            {% if row.net_syp >= 0 %}+{% endif %}{{ "{:,.0f}".format(row.net_syp / 100) }} <span class="text-[8px]">جديدة</span>
                                         </div>
                                         {% if row.net_usd > 0 %}
-                                            <div class="text-[9px] sm:text-[11px] text-violet-500/70">+{{ "{:,.2f}".format(row.net_usd) }} $</div>
+                                            <div class="text-[8px] sm:text-[10px] text-violet-500/70">+{{ "{:,.2f}".format(row.net_usd) }} $</div>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -156,13 +169,20 @@
                                 <tr class="bg-slate-800/70 border-t-2 border-slate-600 font-bold text-sm">
                                     <td class="px-6 py-4 text-white uppercase tracking-wider text-xs">{% if session.get('lang', 'ar') == 'ar' %}الإجمالي{% else %}Grand Total{% endif %}</td>
                                     <td class="px-6 py-4 text-right">
-                                        <div class="text-emerald-300">{{ "{:,.0f}".format(income_total_syp) }} <span class="text-[10px]">ل.س</span></div>
+                                        <div class="text-emerald-300 text-[11px]">{{ "{:,.0f}".format(income_total_syp) }} <span class="text-[8px]">قديمة</span></div>
+                                        <div class="text-blue-300 text-[11px]">{{ "{:,.0f}".format(income_total_syp / 100) }} <span class="text-[8px]">جديدة</span></div>
                                         <div class="text-emerald-400 text-xs">{{ "{:,.2f}".format(income_total_usd) }} $</div>
                                     </td>
-                                    <td class="px-6 py-4 text-right text-rose-300">{{ "{:,.0f}".format(expense_total) }} <span class="text-[10px]">ل.س</span></td>
+                                    <td class="px-6 py-4 text-right text-rose-300">
+                                        <div class="text-[11px]">{{ "{:,.0f}".format(expense_total) }} <span class="text-[8px]">قديمة</span></div>
+                                        <div class="text-[11px] text-rose-200">{{ "{:,.0f}".format(expense_total / 100) }} <span class="text-[8px]">جديدة</span></div>
+                                    </td>
                                     <td class="px-6 py-4 text-right">
-                                        <div class="{% if net_profit_syp >= 0 %}text-violet-300{% else %}text-red-300{% endif %}">
-                                            {% if net_profit_syp >= 0 %}+{% endif %}{{ "{:,.0f}".format(net_profit_syp) }} <span class="text-[10px]">ل.س</span>
+                                        <div class="{% if net_profit_syp >= 0 %}text-violet-300{% else %}text-red-300{% endif %} text-[11px]">
+                                            {% if net_profit_syp >= 0 %}+{% endif %}{{ "{:,.0f}".format(net_profit_syp) }} <span class="text-[8px]">قديمة</span>
+                                        </div>
+                                        <div class="text-blue-300 text-[11px]">
+                                            {% if net_profit_syp >= 0 %}+{% endif %}{{ "{:,.0f}".format(net_profit_syp / 100) }} <span class="text-[8px]">جديدة</span>
                                         </div>
                                         <div class="{% if net_profit_usd >= 0 %}text-violet-400{% else %}text-red-400{% endif %} text-xs">
                                             {% if net_profit_usd >= 0 %}+{% endif %}{{ "{:,.2f}".format(net_profit_usd) }} $
@@ -200,7 +220,10 @@
                                 <tr class="hover:bg-slate-800/40 transition-colors">
                                     <td class="px-6 py-3 whitespace-nowrap font-medium text-white">{{ row.profile_name }}</td>
                                     <td class="px-6 py-3 whitespace-nowrap text-center text-slate-400">{{ row.count }}</td>
-                                    <td class="px-6 py-3 whitespace-nowrap text-right text-emerald-400 font-bold">{{ "{:,.0f}".format(row.total) }}</td>
+                                    <td class="px-6 py-3 whitespace-nowrap text-right text-emerald-400 font-bold">
+                                        <div class="text-xs">{{ "{:,.0f}".format(row.total) }} <small class="text-[8px] opacity-60">قديمة</small></div>
+                                        <div class="text-[10px] text-blue-400">{{ "{:,.0f}".format(row.total / 100) }} <small class="text-[8px] opacity-60">جديدة</small></div>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             {% else %}
@@ -227,12 +250,18 @@
                         {% for cat in expense_by_category %}
                         <div class="px-5 py-4 flex items-center justify-between hover:bg-slate-800/30 transition-colors">
                             <span class="text-xs text-slate-300 font-medium pr-3">{{ cat.category }}</span>
-                            <span class="text-xs font-bold text-rose-400 shrink-0">{{ "{:,.0f}".format(cat.total) }} ل.س</span>
+                            <div class="flex flex-col items-end">
+                                <span class="text-xs font-bold text-rose-400 shrink-0">{{ "{:,.0f}".format(cat.total) }} <small class="text-[8px] opacity-60">قديمة</small></span>
+                                <span class="text-[10px] font-bold text-rose-300 shrink-0">{{ "{:,.0f}".format(cat.total / 100) }} <small class="text-[8px] opacity-60">جديدة</small></span>
+                            </div>
                         </div>
                         {% endfor %}
                         <div class="px-5 py-3 bg-slate-800/50 flex items-center justify-between border-t border-slate-700">
                             <span class="text-[10px] text-slate-400 uppercase font-bold">{% if session.get('lang', 'ar') == 'ar' %}الإجمالي{% else %}Total{% endif %}</span>
-                            <span class="text-xs font-bold text-rose-300">{{ "{:,.0f}".format(expense_total) }} ل.س</span>
+                            <div class="flex flex-col items-end">
+                                <span class="text-xs font-bold text-rose-300">{{ "{:,.0f}".format(expense_total) }} <small class="text-[8px] opacity-60">قديمة</small></span>
+                                <span class="text-[10px] font-bold text-rose-200">{{ "{:,.0f}".format(expense_total / 100) }} <small class="text-[8px] opacity-60">جديدة</small></span>
+                            </div>
                         </div>
                     {% else %}
                         <div class="px-6 py-10 text-center text-slate-500 text-sm">
@@ -254,7 +283,10 @@
                     <div>
                         <div class="flex justify-between text-[11px] font-bold mb-2">
                             <span class="text-emerald-400 uppercase">{% if session.get('lang', 'ar') == 'ar' %}الاشتراكات{% else %}Subscriptions{% endif %}</span>
-                            <span class="text-slate-400">{{ "{:,.0f}".format(subscriber_income) }} ل.س</span>
+                            <div class="flex flex-col items-end">
+                                <span class="text-slate-400">{{ "{:,.0f}".format(subscriber_income) }} <small class="text-[8px]">قديمة</small></span>
+                                <span class="text-slate-500 text-[9px]">{{ "{:,.0f}".format(subscriber_income / 100) }} <small class="text-[8px]">جديدة</small></span>
+                            </div>
                         </div>
                         <div class="h-2 bg-slate-700 rounded-full overflow-hidden shadow-inner">
                             <div class="h-full bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)]" style="width: {{ sub_percent }}%"></div>
@@ -264,7 +296,10 @@
                     <div>
                         <div class="flex justify-between text-[11px] font-bold mb-2">
                             <span class="text-blue-400 uppercase">{% if session.get('lang', 'ar') == 'ar' %}التركيبات{% else %}Installations{% endif %}</span>
-                            <span class="text-slate-400">{{ "{:,.0f}".format(installations_income_syp) }} ل.س</span>
+                            <div class="flex flex-col items-end">
+                                <span class="text-slate-400">{{ "{:,.0f}".format(installations_income_syp) }} <small class="text-[8px]">قديمة</small></span>
+                                <span class="text-slate-500 text-[9px]">{{ "{:,.0f}".format(installations_income_syp / 100) }} <small class="text-[8px]">جديدة</small></span>
+                            </div>
                         </div>
                         <div class="h-2 bg-slate-700 rounded-full overflow-hidden shadow-inner">
                             <div class="h-full bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.4)]" style="width: {{ inst_percent }}%"></div>
@@ -276,7 +311,8 @@
                     <div class="flex flex-col gap-1 items-end">
                         <span class="text-xs text-slate-500 font-bold uppercase w-full text-right">{% if session.get('lang', 'ar') == 'ar' %}إجمالي المحصل{% else %}Gross Revenue{% endif %}</span>
                         <span class="text-lg font-black text-emerald-400 italic tracking-tighter">{{ "{:,.2f}".format(income_total_usd) }} $</span>
-                        <span class="text-base font-black text-white italic tracking-tighter">{{ "{:,.0f}".format(income_total_syp) }} ل.س</span>
+                        <span class="text-base font-black text-white italic tracking-tighter">{{ "{:,.0f}".format(income_total_syp) }} <small class="text-[10px]">قديمة</small></span>
+                        <span class="text-sm font-black text-blue-400 italic tracking-tighter">{{ "{:,.0f}".format(income_total_syp / 100) }} <small class="text-[10px]">جديدة</small></span>
                     </div>
                 </div>
             </div>

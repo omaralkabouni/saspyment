@@ -59,6 +59,10 @@
                                 <i class="fa-solid fa-link w-4 opacity-70"></i> 
                                 {% if session.get('lang', 'ar') == 'ar' %}إعدادات الويب هوك{% else %}Webhook Settings{% endif %}
                             </a>
+                             <a href="{{ url_for('manage_packages') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
+                                <i class="fa-solid fa-box-open w-4 opacity-70"></i> 
+                                {% if session.get('lang', 'ar') == 'ar' %}إدارة باقات الموقع{% else %}Landing Packages{% endif %}
+                            </a>
                             <a href="{{ url_for('backup_db') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
                                 <i class="fa-solid fa-database w-4 opacity-70"></i> 
                                 {% if session.get('lang', 'ar') == 'ar' %}تحميل نسخة احتياطية{% else %}Database Backup{% endif %}
@@ -175,6 +179,9 @@
             </a>
             <a href="{{ url_for('webhook_settings') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('webhook_settings') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
                 <i class="fa-solid fa-link w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}إعدادات الويب هوك{% else %}Webhook Settings{% endif %}
+            </a>
+            <a href="{{ url_for('manage_packages') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('manage_packages') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-box-open w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}إدارة باقات الموقع{% else %}Landing Packages{% endif %}
             </a>
             {% endif %}
         </div>

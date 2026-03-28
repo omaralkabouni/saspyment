@@ -123,7 +123,10 @@
                             <i class="fa-solid fa-ghost mr-1"></i> Direct / No Parent
                         {% endif %}
                     </span>
-                    <span class="text-xl font-bold text-emerald-400">{{ "{:,.0f}".format(stat.daily_total) }} <span class="text-sm font-normal text-emerald-500">ل.س</span></span>
+                    <div class="flex flex-col">
+                        <span class="text-xl font-bold text-emerald-400">{{ "{:,.0f}".format(stat.daily_total) }} <span class="text-[10px] font-normal text-slate-500">ل.س (قديمة)</span></span>
+                        <span class="text-lg font-bold text-blue-400">{{ "{:,.0f}".format(stat.daily_total / 100) }} <span class="text-[10px] font-normal text-slate-500">ل.س (جديدة)</span></span>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -262,9 +265,14 @@
                                     </td>
 
                                     <td class="px-4 py-4 whitespace-nowrap text-right align-top pt-5">
-                                        <span class="text-emerald-400 font-bold text-xs sm:text-sm">
-                                            {{ "{:,.0f}".format(payment.amount) }} <span class="text-[9px]">ل.س</span>
-                                        </span>
+                                        <div class="flex flex-col">
+                                            <span class="text-emerald-400 font-bold text-xs sm:text-sm">
+                                                {{ "{:,.0f}".format(payment.amount) }} <span class="text-[8px] text-slate-500">قديمة</span>
+                                            </span>
+                                            <span class="text-blue-400 font-bold text-[10px] sm:text-xs">
+                                                {{ "{:,.0f}".format(payment.amount / 100) }} <span class="text-[8px] text-slate-500">جديدة</span>
+                                            </span>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-4 whitespace-nowrap text-center align-top pt-5">
                                         {% if payment.amount > 0 %}
@@ -284,9 +292,15 @@
                                             <button data-id="{{ payment.id }}" data-amount="{{ payment.amount }}" onclick="openEditModal(this.dataset.id, this.dataset.amount)" class="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-colors" title="Edit">
                                                 <i class="fa-solid fa-pen text-[9px]"></i>
                                             </button>
-                                            <a href="{{ url_for('print_invoice', p_id=payment.id) }}" target="_blank" class="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors" title="Print">
+                                            <a href="{{ url_for('print_invoice', p_id=payment.id) }}" target="_blank" class="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors" title="Print & QR">
                                                 <i class="fa-solid fa-print text-[9px]"></i>
                                             </a>
+                                            <a href="{{ url_for('public_invoice', token=payment.public_token) }}" target="_blank" class="p-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 transition-colors" title="View Customer Side">
+                                                <i class="fa-solid fa-eye text-[9px]"></i>
+                                            </a>
+                                            <button onclick="openDeleteModal('{{ payment.id }}')" class="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors" title="Delete">
+                                                <i class="fa-solid fa-trash text-[9px]"></i>
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>

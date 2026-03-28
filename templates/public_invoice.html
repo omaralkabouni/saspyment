@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فاتورة رقم #{{ p.id }} - {{ p.username }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #1e1e2e 0%, #11111b 100%);
+            color: #cdd6f4;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(30, 30, 46, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 450px;
+            width: 100%;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #f5e0dc; margin: 0; font-size: 24px; }
+        .header p { color: #a6adc8; margin: 5px 0 0; font-size: 14px; }
+        .info-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 10px;
+        }
+        .info-row:last-child { border: none; margin: 0; padding: 0; }
+        .label { color: #89b4fa; font-weight: bold; }
+        .value { color: #ffffff; }
+        .amount {
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            color: #a6e3a1;
+            margin: 20px 0;
+        }
+        .subscriber-details {
+            font-size: 13px;
+            color: #bac2de;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #7f849c;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .status-paid { background: #a6e3a1; color: #11111b; }
+        .status-unpaid { background: #f38ba8; color: #11111b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Top Net Syria</h1>
+            <p>فاتورة إلكترونية معتمدة</p>
+        </div>
+
+        <div class="amount">
+            <div style="font-size: 0.6em; opacity: 0.8; margin-bottom: 5px;">جديدة</div>
+            {{ "{:,.0f}".format(p.amount / 100) }} ل.س
+            <div style="font-size: 0.4em; opacity: 0.6; margin-top: 5px;">قديمة: {{ "{:,.0f}".format(p.amount) }} ل.س</div>
+        </div>
+
+        <div class="info-card">
+            <div class="info-row">
+                <span class="label">رقم الفاتورة:</span>
+                <span class="value">#{{ p.id }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">الحالة:</span>
+                {% if p.amount > 0 %}
+                <span class="status-badge status-paid">مدفوعة</span>
+                {% else %}
+                <span class="status-badge status-unpaid">غير مدفوعة</span>
+                {% endif %}
+            </div>
+            <div class="info-row">
+                <span class="label">التاريخ:</span>
+                <span class="value">{{ p.created_at }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">نوع الشحن:</span>
+                <span class="value">{{ p.profile_name }}</span>
+            </div>
+        </div>
+
+        <div class="subscriber-details">
+            <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #f5e0dc;">معلومات صاحب الاشتراك</h3>
+            <div class="info-row">
+                <span class="label">الاسم:</span>
+                <span class="value">{{ p.fullname or p.username }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">اسم المستخدم:</span>
+                <span class="value">{{ p.username }}</span>
+            </div>
+            {% if sub %}
+            <div class="info-row">
+                <span class="label">انتهاء الصلاحية:</span>
+                <span class="value">{{ sub.expiration or 'غير متوفر حالياً' }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="footer">
+            شكراً لتعاملكم معنا <br>
+            <b>القابوني غروب محدودة المسؤولية</b>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+
+{% block title %}إدارة الباقات - لوحة التحكم{% endblock %}
+
+{% block content %}
+{% include 'navbar.html' %}
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-white mb-2">إدارة باقات الموقع</h1>
+            <p class="text-slate-400">تحكم بالباقات والأسعار التي تظهر لزوار موقع الشركة.</p>
+        </div>
+        <button onclick="openAddModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2">
+            <i class="fa-solid fa-plus"></i> إضافة باقة جديدة
+        </button>
+    </div>
+
+    <!-- Flash Messages (Manual check for this template) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="mb-6 p-4 rounded-xl {% if category == 'success' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% else %}bg-red-500/10 text-red-500 border border-red-500/20{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="glass-panel rounded-3xl overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-right border-collapse">
+                <thead>
+                    <tr class="bg-slate-800/50 text-slate-300 text-sm uppercase tracking-wider border-b border-white/5">
+                        <th class="px-6 py-5">اسم الباقة</th>
+                        <th class="px-6 py-5">السرعة (Mbps)</th>
+                        <th class="px-6 py-5">السعر (ل.س)</th>
+                        <th class="px-6 py-5">الحالة</th>
+                        <th class="px-6 py-5 text-center">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    {% for pkg in packages %}
+                    <tr class="hover:bg-white/5 transition-colors">
+                        <td class="px-6 py-5">
+                            <span class="font-bold text-white">{{ pkg.name }}</span>
+                        </td>
+                        <td class="px-6 py-5">
+                            <span class="bg-blue-600/10 text-blue-400 px-3 py-1 rounded-lg text-sm font-bold">
+                                {{ pkg.speed }} Mbps
+                            </span>
+                        </td>
+                        <td class="px-6 py-5 text-emerald-400 font-bold">
+                            {{ pkg.price_syp }} ل.س
+                        </td>
+                        <td class="px-6 py-5">
+                            {% if pkg.is_active %}
+                                <span class="bg-emerald-500/10 text-emerald-500 px-3 py-1 rounded-lg text-xs font-bold uppercase">نشط</span>
+                            {% else %}
+                                <span class="bg-slate-700 text-slate-400 px-3 py-1 rounded-lg text-xs font-bold uppercase">مخفي</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-5">
+                            <div class="flex justify-center gap-3">
+                                <button data-pkg='{{ pkg|tojson|safe }}' onclick="openEditModal(JSON.parse(this.getAttribute('data-pkg')))" class="p-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white rounded-lg transition-all" title="تعديل">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <a href="{{ url_for('delete_package', pkg_id=pkg.id) }}" onclick="return confirm('هل أنت متأكد من حذف هذه الباقة؟')" class="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all" title="حذف">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-20 text-center text-slate-500">
+                            <i class="fa-solid fa-box-open text-5xl mb-4 opacity-20"></i>
+                            <p>لا يوجد باقات مضافة حالياً</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="packageModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal()"></div>
+    <div class="glass-panel w-full max-w-2xl p-8 rounded-3xl relative z-[101] shadow-2xl animate-in zoom-in duration-200">
+        <h2 id="modalTitle" class="text-2xl font-bold text-white mb-6">إضافة باقة جديدة</h2>
+        
+        <form id="packageForm" action="{{ url_for('add_package') }}" method="POST" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-2 mr-1">اسم الباقة</label>
+                    <input type="text" name="name" id="pkg_name" required 
+                           class="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-blue-500 text-right">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-2 mr-1">السرعة (Mbps)</label>
+                    <input type="text" name="speed" id="pkg_speed" required 
+                           class="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-blue-500 text-left" dir="ltr">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-2 mr-1">السعر (ل.س)</label>
+                    <input type="text" name="price_syp" id="pkg_price_syp" required 
+                           class="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-blue-500 text-left" dir="ltr">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-2 mr-1">السعر (بالدولار - اختياري)</label>
+                    <input type="text" name="price_usd" id="pkg_price_usd" 
+                           class="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-blue-500 text-left" dir="ltr">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2 mr-1">وصف الباقة</label>
+                <textarea name="description" id="pkg_desc" rows="3" 
+                          class="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-blue-500 text-right"></textarea>
+            </div>
+
+            <div class="flex items-center gap-3 bg-slate-900/30 p-4 rounded-xl border border-white/5">
+                <input type="checkbox" name="is_active" id="pkg_active" checked 
+                       class="w-5 h-5 rounded border-white/10 bg-slate-900 text-blue-600 focus:ring-blue-600 focus:ring-offset-slate-900 cursor-pointer">
+                <label for="pkg_active" class="text-sm font-medium text-white cursor-pointer select-none">عرض الباقة على الموقع للزوار</label>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-6 border-t border-white/5">
+                <button type="button" onclick="closeModal()" class="px-6 py-3 rounded-xl text-slate-300 hover:bg-white/5 transition-all">إلغاء</button>
+                <button type="submit" id="submitBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-600/20">
+                    حفظ الباقة
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const modal = document.getElementById('packageModal');
+    const form = document.getElementById('packageForm');
+    const title = document.getElementById('modalTitle');
+    
+    function openAddModal() {
+        form.action = "{{ url_for('add_package') }}";
+        title.innerText = "إضافة باقة جديدة";
+        form.reset();
+        document.getElementById('pkg_active').checked = true;
+        modal.classList.remove('hidden');
+    }
+
+    function openEditModal(pkg) {
+        form.action = `/admin/packages/edit/${pkg.id}`;
+        title.innerText = "تعديل الباقة: " + pkg.name;
+        
+        document.getElementById('pkg_name').value = pkg.name;
+        document.getElementById('pkg_speed').value = pkg.speed;
+        document.getElementById('pkg_price_syp').value = pkg.price_syp;
+        document.getElementById('pkg_price_usd').value = pkg.price_usd || '';
+        document.getElementById('pkg_desc').value = pkg.description || '';
+        document.getElementById('pkg_active').checked = pkg.is_active === 1;
+        
+        modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+        modal.classList.add('hidden');
+    }
+</script>
+{% endblock %}

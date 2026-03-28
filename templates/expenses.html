@@ -48,7 +48,10 @@
         <div class="bg-slate-800/80 border border-slate-700 px-6 py-5 rounded-xl shadow-xl flex items-center justify-between">
             <div>
                 <p class="text-sm text-slate-400 uppercase tracking-widest font-bold mb-1"><i class="fa-regular fa-calendar-day mr-1"></i> Today's Expenses</p>
-                <p class="text-3xl font-bold text-rose-400">{{ "{:,.0f}".format(daily_total) }} <span class="text-base font-normal text-rose-500">ل.س</span></p>
+                <div class="flex flex-col">
+                    <span class="text-3xl font-bold text-rose-400">{{ "{:,.0f}".format(daily_total) }} <span class="text-xs font-normal text-rose-500">قديمة</span></span>
+                    <span class="text-2xl font-bold text-rose-300">{{ "{:,.0f}".format(daily_total / 100) }} <span class="text-xs font-normal text-rose-500">جديدة</span></span>
+                </div>
             </div>
             <div class="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
                 <i class="fa-solid fa-arrow-trend-down text-rose-500 text-xl"></i>
@@ -58,7 +61,10 @@
         <div class="bg-slate-800/80 border border-slate-700 px-6 py-5 rounded-xl shadow-xl flex items-center justify-between">
             <div>
                 <p class="text-sm text-slate-400 uppercase tracking-widest font-bold mb-1"><i class="fa-regular fa-calendar-days mr-1"></i> This Month's Expenses</p>
-                <p class="text-3xl font-bold text-rose-400">{{ "{:,.0f}".format(monthly_total) }} <span class="text-base font-normal text-rose-500">ل.س</span></p>
+                <div class="flex flex-col">
+                    <span class="text-3xl font-bold text-rose-400">{{ "{:,.0f}".format(monthly_total) }} <span class="text-xs font-normal text-rose-500">قديمة</span></span>
+                    <span class="text-2xl font-bold text-rose-300">{{ "{:,.0f}".format(monthly_total / 100) }} <span class="text-xs font-normal text-rose-500">جديدة</span></span>
+                </div>
             </div>
             <div class="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
                 <i class="fa-solid fa-chart-pie text-rose-500 text-xl"></i>
@@ -169,9 +175,14 @@
                                     </td>
 
                                     <td class="px-6 py-4 whitespace-nowrap text-right align-top pt-5">
-                                        <span class="text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded border border-rose-500/20 text-sm block min-w-[100px]">
-                                            {{ "{:,.0f}".format(expense.amount) }} ل.س
-                                        </span>
+                                        <div class="flex flex-col items-end">
+                                            <span class="text-rose-400 font-bold text-xs">
+                                                {{ "{:,.0f}".format(expense.amount) }} <small class="text-[8px] opacity-60">قديمة</small>
+                                            </span>
+                                            <span class="text-rose-300 font-bold text-sm">
+                                                {{ "{:,.0f}".format(expense.amount / 100) }} <small class="text-[8px] opacity-60">جديدة</small>
+                                            </span>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-left pl-6 align-top pt-5 text-xs">
                                         <div class="flex flex-col space-y-1 text-slate-300">
