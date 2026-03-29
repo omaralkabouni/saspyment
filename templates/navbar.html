@@ -55,6 +55,10 @@
                                 <i class="fa-solid fa-user-shield w-4 opacity-70"></i> 
                                 {% if session.get('lang', 'ar') == 'ar' %}إدارة الموظفين{% else %}Staff Management{% endif %}
                             </a>
+                            <a href="{{ url_for('settings_sas') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
+                                <i class="fa-solid fa-server w-4 opacity-70"></i> 
+                                {% if session.get('lang', 'ar') == 'ar' %}إعدادات سيرفر الساس{% else %}SAS Server Settings{% endif %}
+                            </a>
                             <a href="{{ url_for('webhook_settings') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
                                 <i class="fa-solid fa-link w-4 opacity-70"></i> 
                                 {% if session.get('lang', 'ar') == 'ar' %}إعدادات الويب هوك{% else %}Webhook Settings{% endif %}
@@ -81,20 +85,17 @@
             <div class="hidden lg:flex items-center space-x-4">
                 <!-- API & Sync Status -->
                 <div class="flex items-center space-x-3 mr-4 py-1.5 px-3 bg-slate-900/50 rounded-full border border-slate-700/50 shadow-inner">
-                    {% if api_status == 'online' %}
+                    {% if api_status == 'refreshing' %}
+                        <span class="flex h-2.5 w-2.5">
+                            <i class="fa-solid fa-sync fa-spin text-blue-400 text-[10px]"></i>
+                        </span>
+                        <span class="text-[10px] text-blue-400 font-bold uppercase tracking-widest">{% if session.get('lang', 'ar') == 'ar' %}جاري المزامنة...{% else %}Syncing...{% endif %}</span>
+                    {% elif api_status == 'online' or api_status == 'cached' %}
                         <span class="flex h-2.5 w-2.5 relative">
                             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                         </span>
-                        <span class="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">SAS Live</span>
-                    {% elif api_status == 'refreshing' %}
-                        <span class="flex h-2.5 w-2.5">
-                            <i class="fa-solid fa-sync fa-spin text-blue-400 text-[10px]"></i>
-                        </span>
-                        <span class="text-[10px] text-blue-400 font-bold uppercase tracking-widest">Syncing...</span>
-                    {% elif api_status == 'cached_recent' %}
-                        <span class="h-2.5 w-2.5 rounded-full bg-emerald-600/50"></span>
-                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Synced</span>
+                        <span class="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">{% if api_status == 'online' %}SAS Live{% else %}{% if session.get('lang', 'ar') == 'ar' %}بيانات محفوظة{% else %}Cached{% endif %}{% endif %}</span>
                     {% else %}
                         <span class="flex h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span>
                         <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest">Offline</span>
@@ -138,7 +139,9 @@
             <!-- Mobile Menu Button -->
             <div class="lg:hidden flex items-center space-x-4">
                 <div class="flex items-center space-x-2 mr-2">
-                    {% if api_status == 'online' %}
+                    {% if api_status == 'refreshing' %}
+                        <i class="fa-solid fa-sync fa-spin text-blue-400 text-[10px]"></i>
+                    {% elif api_status == 'online' or api_status == 'cached' %}
                         <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
                     {% else %}
                         <span class="h-2 w-2 rounded-full bg-red-500"></span>
@@ -179,6 +182,9 @@
             {% if session.get('role') == 'admin' %}
             <a href="{{ url_for('manage_users') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('manage_users') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
                 <i class="fa-solid fa-user-shield w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}إدارة الموظفين{% else %}Staff Management{% endif %}
+            </a>
+            <a href="{{ url_for('settings_sas') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('settings_sas') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-server w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}إعدادات الساس{% else %}SAS Settings{% endif %}
             </a>
             <a href="{{ url_for('webhook_settings') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('webhook_settings') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
                 <i class="fa-solid fa-link w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}إعدادات الويب هوك{% else %}Webhook Settings{% endif %}

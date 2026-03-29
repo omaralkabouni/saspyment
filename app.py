@@ -81,7 +81,7 @@ USER_CACHE: dict[str, Any] = {
     'timestamp': 0.0,
     'is_refreshing': False
 }
-CACHE_DURATION = 14400 # 4 hours cache for better performance by preserving data in DB
+CACHE_DURATION = 1800 # 30 minutes background revalidation (Non-blocking)
 
 DELETE_PASS_FILE = 'delete_password.txt'
 
@@ -335,12 +335,12 @@ def get_db_connection():
 
 def fetch_all_users_from_api(token, force_refresh=False) -> dict[str, Any]:
     """
-    Fetches users from the SAS API. 
-    Checks memory first, then DB, and refreshes in background if needed.
+    Fetches users from the SAS API with zero UI blocking.
+    Always returns current cache (mem/db) immediately, refreshes in background.
     """
     now = time.time()
     
-    # 1. Load from DB Cache if memory is empty
+    # 1. Load from DB Cache ONLY if memory is completely empty
     if USER_CACHE['data'] is None:
         try:
             conn = sqlite3.connect(DB_PATH)
@@ -350,98 +350,171 @@ def fetch_all_users_from_api(token, force_refresh=False) -> dict[str, Any]:
                 USER_CACHE['data'] = json.loads(row[0])
                 USER_CACHE['total'] = row[1]
                 USER_CACHE['timestamp'] = row[2]
+                print(f"DEBUG: Initial load: {len(USER_CACHE['data'])} users found in DB cache.")
         except Exception as e:
             print(f"DEBUG: DB Cache error: {e}")
 
-    # 2. Return if fresh
-    if not force_refresh and USER_CACHE['data'] is not None and (now - USER_CACHE['timestamp'] < CACHE_DURATION):
-        return {'data': USER_CACHE['data'], 'total': USER_CACHE['total'], 'status': 'cached_recent', 'timestamp': USER_CACHE['timestamp']}
+    # 2. Determine if we need to start a background refresh
+    should_refresh = force_refresh or (USER_CACHE['data'] is None) or (now - USER_CACHE['timestamp'] > CACHE_DURATION)
     
-    # 3. If refreshing already
+    if should_refresh and not USER_CACHE['is_refreshing']:
+        # Start background thread immediately, no waiting
+        threading.Thread(target=background_refresh, args=(token,), daemon=True).start()
+    
+    # 3. Always return current state immediately
+    status = 'online'
     if USER_CACHE['is_refreshing']:
-        return {'data': USER_CACHE['data'], 'total': USER_CACHE['total'], 'status': 'refreshing', 'timestamp': USER_CACHE['timestamp']}
+        status = 'refreshing'
+    elif USER_CACHE['data'] is not None:
+        status = 'cached'
+    else:
+        status = 'empty_init_sync'
 
-    def background_refresh(token_inner):
-        USER_CACHE['is_refreshing'] = True
-        try:
-            payload_dict = {
-                "page": 1,
-                "count": 5000, 
-                "sortBy": "username",
-                "direction": "asc",
-                "search": "",
-                "show_password": 1,
-                "show_passwords": 1,      # Alternative flag
-                "plain_password": 1,      # Another common one
-                "with_password": 1,       # Version specific
-            }
-            encrypted_payload = aes.encrypt(json.dumps(payload_dict))
-            print(f"DEBUG: Triggering SAS API fetch for 'index/user' with extended password flags...")
-            response = sasclient.post(token_inner, 'index/user', encrypted_payload)
+    return {
+        'data': USER_CACHE['data'] or [], 
+        'total': USER_CACHE['total'], 
+        'status': status, 
+        'timestamp': USER_CACHE['timestamp']
+    }
+
+@app.route('/api/user/<username>')
+def get_single_user(username):
+    """
+    On-demand lookup for a specific user. 
+    Checks local cache first, then queries SAS API directly if not found.
+    Allows for instant discovery of newly created users.
+    """
+    if 'token' not in session: return json.dumps({'error': 'Unauthorized'}), 401
+    
+    username = username.strip()
+    # 1. Check current memory cache
+    if USER_CACHE['data']:
+        found = next((u for u in USER_CACHE['data'] if u.get('username') == username), None)
+        if found:
+            return json.dumps({'status': 'cached', 'user': found})
+    
+    # 2. Not in memory? Check DB subscribers table
+    try:
+        conn = get_db_connection()
+        row = conn.execute("SELECT json_data FROM subscribers WHERE username = ?", (username,)).fetchone()
+        conn.close()
+        if row:
+            user_data = json.loads(row['json_data'])
+            # Soft update memory if needed
+            return json.dumps({'status': 'db_cached', 'user': user_data})
+    except Exception as e:
+        print(f"DEBUG: DB lookup error: {e}")
+
+    # 3. Not in DB? Query SAS API directly for THIS username
+    try:
+        payload_dict = {
+            "page": 1,
+            "count": 1, 
+            "search": username,
+            "show_password": 1,
+        }
+        encrypted_payload = aes.encrypt(json.dumps(payload_dict))
+        print(f"DEBUG: On-demand SAS lookup for user: {username}")
+        response = sasclient.post(session['token'], 'index/user', encrypted_payload)
+        
+        if isinstance(response, dict) and response.get('data'):
+            users = response.get('data') or []
+            found_user = next((u for u in users if u.get('username') == username), None)
             
-            if isinstance(response, dict) and 'data' in response:
-                users = response.get('data') or []
-                total = response.get('total') or 0
+            if found_user:
+                # Update DB & Memory Cache locally
                 ts = time.time()
-                
-                USER_CACHE['data'] = users
-                USER_CACHE['total'] = total
-                USER_CACHE['timestamp'] = ts
-                
-                # Save to DB asynchronously inside the background task
                 try:
                     conn = sqlite3.connect(DB_PATH)
-                    # 1. Update the global cache blob
-                    json_str = json.dumps(users)
-                    conn.execute("INSERT OR REPLACE INTO sas_cache (id, json_data, total, updated_at) VALUES (1, ?, ?, ?)", (json_str, total, ts))
-                    
-                    # 2. Update the individual subscribers table for local login
-                    for u in users:
-                        # Try to find password in multiple possible fields
-                        pwd = (u.get('password') or 
-                               u.get('plain_password') or 
-                               u.get('user_password') or 
-                               u.get('details', {}).get('password') if isinstance(u.get('details'), dict) else '')
-                        
-                        conn.execute('''
-                            INSERT OR REPLACE INTO subscribers 
-                            (username, password, firstname, lastname, mobile, profile, expiration, status, parent_username, json_data, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (
-                            u.get('username'),
-                            pwd,
-                            u.get('firstname'),
-                            u.get('lastname'),
-                            u.get('mobile') or u.get('phone'),
-                            u.get('profile_details', {}).get('name') if isinstance(u.get('profile_details'), dict) else '',
-                            u.get('expiration'),
-                            1 if (isinstance(u.get('status'), dict) and u.get('status').get('status')) else 0,
-                            u.get('parent_username'),
-                            json.dumps(u),
-                            ts
-                        ))
-                    
+                    pwd = (found_user.get('password') or found_user.get('plain_password') or found_user.get('user_password') or '')
+                    conn.execute('''
+                        INSERT OR REPLACE INTO subscribers 
+                        (username, password, firstname, lastname, mobile, profile, expiration, status, parent_username, json_data, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        found_user.get('username'), pwd, found_user.get('firstname'), found_user.get('lastname'), found_user.get('mobile') or found_user.get('phone'),
+                        found_user.get('profile_details', {}).get('name') if isinstance(found_user.get('profile_details'), dict) else '',
+                        found_user.get('expiration'), 1 if (isinstance(found_user.get('status'), dict) and found_user.get('status').get('status')) else 0,
+                        found_user.get('parent_username'), json.dumps(found_user), ts
+                    ))
                     conn.commit()
                     conn.close()
-                except Exception as e:
-                    print(f"DEBUG: Failed to save to local DB: {e}")
                     
-                print(f"DEBUG: SAS API Success! Fetched {len(users)} users. Total: {total}")
-            else:
-                print(f"DEBUG: SAS API Failed or empty. Response type: {type(response)}, Status/Result: {response}")
-        except Exception as e:
-            print(f"DEBUG: SAS API Exception during fetch: {e}")
-        finally:
-            USER_CACHE['is_refreshing'] = False
+                    # Update memory cache if it exists
+                    if USER_CACHE['data'] is not None:
+                        # Replace or append
+                        idx = next((i for i, u in enumerate(USER_CACHE['data']) if u.get('username') == username), -1)
+                        if idx >= 0: USER_CACHE['data'][idx] = found_user
+                        else: USER_CACHE['data'].append(found_user)
+                except Exception as db_e:
+                    print(f"DEBUG: Async single-user save error: {db_e}")
+                
+                return json.dumps({'status': 'fresh', 'user': found_user})
+    except Exception as e:
+        print(f"DEBUG: On-demand lookup Exception: {e}")
 
-    # 4. If memory is STILL EMPTY (first time run && db empty), block and refresh
-    if USER_CACHE['data'] is None or force_refresh:
-        background_refresh(token)
-        return {'data': USER_CACHE['data'], 'total': USER_CACHE['total'], 'status': 'online', 'timestamp': USER_CACHE['timestamp']}
-    else:
-        # 5. We have STALE data (DB or Mem > 4 hours old). Return immediately & refresh
-        threading.Thread(target=background_refresh, args=(token,), daemon=True).start()
-        return {'data': USER_CACHE['data'], 'total': USER_CACHE['total'], 'status': 'cached_stale', 'timestamp': USER_CACHE['timestamp']}
+    return json.dumps({'status': 'not_found', 'message': 'User not found in SAS'}), 404
+
+def background_refresh(token_inner):
+    """Heavy lifting is done here, outside the main request/response cycle."""
+    if USER_CACHE['is_refreshing']: return
+    USER_CACHE['is_refreshing'] = True
+    try:
+        payload_dict = {
+            "page": 1,
+            "count": 5000, 
+            "sortBy": "username",
+            "direction": "asc",
+            "search": "",
+            "show_password": 1,
+            "show_passwords": 1, 
+            "plain_password": 1,
+            "with_password": 1,
+        }
+        encrypted_payload = aes.encrypt(json.dumps(payload_dict))
+        print(f"DEBUG: Sync started (background thread)...")
+        response = sasclient.post(token_inner, 'index/user', encrypted_payload)
+        
+        if isinstance(response, dict) and 'data' in response:
+            users = response.get('data') or []
+            total = response.get('total') or 0
+            ts = time.time()
+            
+            # Update memory cache
+            USER_CACHE['data'] = users
+            USER_CACHE['total'] = total
+            USER_CACHE['timestamp'] = ts
+            
+            # Update persistent DB cache
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                json_str = json.dumps(users)
+                conn.execute("INSERT OR REPLACE INTO sas_cache (id, json_data, total, updated_at) VALUES (1, ?, ?, ?)", (json_str, total, ts))
+                
+                # Update individual subscribers table (Offline persistence for public invoices/details)
+                for u in users:
+                    pwd = (u.get('password') or u.get('plain_password') or u.get('user_password') or '')
+                    conn.execute('''
+                        INSERT OR REPLACE INTO subscribers 
+                        (username, password, firstname, lastname, mobile, profile, expiration, status, parent_username, json_data, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        u.get('username'), pwd, u.get('firstname'), u.get('lastname'), u.get('mobile') or u.get('phone'),
+                        u.get('profile_details', {}).get('name') if isinstance(u.get('profile_details'), dict) else '',
+                        u.get('expiration'), 1 if (isinstance(u.get('status'), dict) and u.get('status').get('status')) else 0,
+                        u.get('parent_username'), json.dumps(u), ts
+                    ))
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                print(f"DEBUG: Failed to save async cache to DB: {e}")
+            print(f"DEBUG: Sync complete! {len(users)} users stored.")
+        else:
+            print(f"DEBUG: Sync failed: {response}")
+    except Exception as e:
+        print(f"DEBUG: Sync Exception: {e}")
+    finally:
+        USER_CACHE['is_refreshing'] = False
 
 def send_webhook_async(data, webhook_type='payments', event_name=None, base_url=None):
     """Wrapper to run send_webhook in a background thread."""
@@ -1126,6 +1199,87 @@ def export_payments():
         csv_data_with_bom,
         mimetype="text/csv; charset=utf-8",
         headers={"Content-Disposition": f"attachment;filename={filename}"}
+    )
+
+@app.route('/settings/sas', methods=['GET', 'POST'])
+def settings_sas():
+    global sasclient, SAS_API_IP, SAS_ADMIN_USER, SAS_ADMIN_PASS
+    if 'token' not in session: return redirect(url_for('login'))
+    if session.get('role') != 'admin':
+        flash('🚫 Access Denied: Admin only.', 'error')
+        return redirect(url_for('dashboard'))
+
+    conn = get_db_connection()
+    test_result = None
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        new_ip = request.form.get('sas_ip', '').strip()
+        new_user = request.form.get('sas_user', '').strip()
+        new_pass = request.form.get('sas_pass', '').strip()
+
+        if action == 'test':
+            # Test connection without saving
+            test_client = SasAPI(f"https://{new_ip}", portal='admin')
+            result = test_client.login(new_user, new_pass)
+            token = result[0] if isinstance(result, tuple) else result
+            error = result[1] if isinstance(result, tuple) else None
+            if token:
+                test_result = {'success': True, 'detail': f"✅ Connection successful!\nServer: {new_ip}\nAPI Base: {test_client.base_url}\nToken received: {token[:20]}..."}
+                flash('✅ اتصال ناجح بسيرفر الساس!', 'success')
+            else:
+                test_result = {'success': False, 'detail': f"❌ Connection failed!\nServer: {new_ip}\nError: {error}\n\nAttempts:\n" + "\n".join([f"  {a['url']} → {a['status']}" for a in test_client.attempts])}
+                flash(f'❌ فشل الاتصال: {error}', 'error')
+
+        elif action in ['save', 'save_and_sync']:
+            # Save to DB
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('sas_ip', ?)", (new_ip,))
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('sas_user', ?)", (new_user,))
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('sas_pass', ?)", (new_pass,))
+            conn.commit()
+
+            # Update global variables
+            SAS_API_IP = new_ip
+            SAS_ADMIN_USER = new_user
+            SAS_ADMIN_PASS = new_pass
+
+            # Reinitialize the SAS client with new IP
+            sasclient = SasAPI(f"https://{new_ip}", portal='admin')
+
+            flash('✅ تم حفظ إعدادات الساس بنجاح!', 'success')
+
+            if action == 'save_and_sync':
+                # Attempt login and sync
+                result = sasclient.login(SAS_ADMIN_USER, SAS_ADMIN_PASS)
+                token = result[0] if isinstance(result, tuple) else result
+                if token:
+                    threading.Thread(target=background_refresh, args=(token,), daemon=True).start()
+                    flash('🔄 بدأت المزامنة في الخلفية...', 'success')
+                else:
+                    error = result[1] if isinstance(result, tuple) else 'Unknown'
+                    flash(f'⚠️ تم الحفظ لكن فشل تسجيل الدخول للمزامنة: {error}', 'error')
+
+    # Load current settings
+    sas_ip_row = conn.execute("SELECT value FROM settings WHERE key = 'sas_ip'").fetchone()
+    sas_user_row = conn.execute("SELECT value FROM settings WHERE key = 'sas_user'").fetchone()
+    sas_pass_row = conn.execute("SELECT value FROM settings WHERE key = 'sas_pass'").fetchone()
+    conn.close()
+
+    current_ip = sas_ip_row['value'] if sas_ip_row else SAS_API_IP
+    current_user = sas_user_row['value'] if sas_user_row else SAS_ADMIN_USER
+    current_pass = sas_pass_row['value'] if sas_pass_row else SAS_ADMIN_PASS
+
+    # Last sync time
+    last_sync = None
+    if USER_CACHE['timestamp'] > 0:
+        last_sync = datetime.fromtimestamp(USER_CACHE['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+
+    return render_template('settings_sas.html',
+        current_ip=current_ip,
+        current_user=current_user,
+        current_pass=current_pass,
+        last_sync=last_sync,
+        test_result=test_result
     )
 
 @app.route('/settings/webhook', methods=['GET', 'POST'])
@@ -2368,4 +2522,43 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Startup Sync: attempt to login and refresh cache silently on boot
+    def startup_sync():
+        global sasclient, SAS_API_IP, SAS_ADMIN_USER, SAS_ADMIN_PASS
+        try:
+            # Short delay to ensure Flask/Server is properly initialized
+            time.sleep(10)
+            
+            # Load saved settings from DB if available
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                conn.row_factory = sqlite3.Row
+                ip_row = conn.execute("SELECT value FROM settings WHERE key = 'sas_ip'").fetchone()
+                user_row = conn.execute("SELECT value FROM settings WHERE key = 'sas_user'").fetchone()
+                pass_row = conn.execute("SELECT value FROM settings WHERE key = 'sas_pass'").fetchone()
+                conn.close()
+                
+                if ip_row and ip_row['value']:
+                    SAS_API_IP = ip_row['value']
+                    sasclient = SasAPI(f"https://{SAS_API_IP}", portal='admin')
+                    print(f"DEBUG: Startup Sync: Loaded SAS IP from DB: {SAS_API_IP}")
+                if user_row and user_row['value']:
+                    SAS_ADMIN_USER = user_row['value']
+                if pass_row and pass_row['value']:
+                    SAS_ADMIN_PASS = pass_row['value']
+            except Exception as db_e:
+                print(f"DEBUG: Startup Sync: Could not load DB settings, using .env defaults: {db_e}")
+
+            result = sasclient.login(SAS_ADMIN_USER, SAS_ADMIN_PASS)
+            token = result[0] if isinstance(result, tuple) else result
+            if token:
+                print("DEBUG: Startup Sync: Logged into SAS successfully. Starting silent fetch...")
+                background_refresh(token)
+            else:
+                error_msg = result[1] if isinstance(result, tuple) else 'Unknown'
+                print(f"DEBUG: Startup Sync: SAS Login failed ({error_msg}). Cache will update on next user login.")
+        except Exception as e:
+            print(f"DEBUG: Startup Sync error: {e}")
+            
+    threading.Thread(target=startup_sync, daemon=True).start()
+    app.run(host='0.0.0.0', port=5000)

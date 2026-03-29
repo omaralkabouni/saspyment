@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}{% if session.get('lang', 'ar') == 'ar' %}إعدادات سيرفر الساس{% else %}SAS Server Settings{% endif %} - Top Net{% endblock %}
+
+{% block content %}
+{% include 'navbar.html' %}
+
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-10">
+    <!-- Header -->
+    <div class="mb-10 text-center animate-in fade-in slide-in-from-top-4 duration-700">
+        <h1 class="text-4xl font-black text-white mb-3 flex items-center justify-center gap-3">
+            <div class="w-12 h-12 bg-indigo-600/20 rounded-2xl flex items-center justify-center border border-indigo-500/30">
+                <i class="fa-solid fa-server text-indigo-400"></i>
+            </div>
+            {% if session.get('lang', 'ar') == 'ar' %}إعدادات سيرفر الساس{% else %}SAS Server Settings{% endif %}
+        </h1>
+        <p class="text-slate-400 max-w-2xl mx-auto">
+            {% if session.get('lang', 'ar') == 'ar' %}
+            قم بإعداد عنوان سيرفر SAS Radius وبيانات الدخول للمزامنة التلقائية، واختبر الاتصال مباشرة.
+            {% else %}
+            Configure SAS Radius server address and credentials for automatic synchronization, and test the connection.
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="mb-6 p-4 rounded-xl flex items-center gap-3 animate-in slide-in-from-right-4 duration-500 {% if category == 'success' %}bg-emerald-500/10 border border-emerald-500/20 text-emerald-400{% else %}bg-rose-500/10 border border-rose-500/20 text-rose-400{% endif %}">
+                    <i class="fa-solid {% if category == 'success' %}fa-circle-check{% else %}fa-triangle-exclamation{% endif %}"></i>
+                    <span class="text-sm font-bold">{{ message }}</span>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Current Status Card -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-700/50 shadow-2xl mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-signal text-blue-400"></i>
+                {% if session.get('lang', 'ar') == 'ar' %}حالة الاتصال الحالية{% else %}Current Connection Status{% endif %}
+            </h2>
+            <div id="status-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700">
+                <span class="h-2.5 w-2.5 rounded-full bg-slate-500"></span>
+                <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    {% if session.get('lang', 'ar') == 'ar' %}غير مفحوص{% else %}Not Tested{% endif %}
+                </span>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+            <div class="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
+                <div class="text-[10px] text-slate-500 uppercase font-bold mb-1">{% if session.get('lang', 'ar') == 'ar' %}عنوان السيرفر{% else %}Server IP{% endif %}</div>
+                <div class="text-white font-mono text-xs truncate">{{ current_ip or 'Not Set' }}</div>
+            </div>
+            <div class="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
+                <div class="text-[10px] text-slate-500 uppercase font-bold mb-1">{% if session.get('lang', 'ar') == 'ar' %}اسم المستخدم{% else %}Username{% endif %}</div>
+                <div class="text-white font-bold text-xs">{{ current_user or 'Not Set' }}</div>
+            </div>
+            <div class="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
+                <div class="text-[10px] text-slate-500 uppercase font-bold mb-1">{% if session.get('lang', 'ar') == 'ar' %}آخر مزامنة{% else %}Last Sync{% endif %}</div>
+                <div class="text-white font-bold text-xs">{{ last_sync or 'Never' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Form -->
+    <form method="POST" class="space-y-6">
+        <div class="glass-panel p-6 rounded-2xl border border-slate-700/50 shadow-2xl bg-gradient-to-br from-indigo-500/5 to-transparent">
+            <h2 class="text-lg font-bold text-white mb-6 flex items-center gap-2 border-b border-slate-700/50 pb-3">
+                <i class="fa-solid fa-gear text-indigo-400"></i>
+                {% if session.get('lang', 'ar') == 'ar' %}بيانات الاتصال{% else %}Connection Details{% endif %}
+            </h2>
+
+            <div class="space-y-5">
+                <!-- Server IP -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        {% if session.get('lang', 'ar') == 'ar' %}عنوان سيرفر الساس (IP أو Domain){% else %}SAS Server Address (IP or Domain){% endif %}
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-indigo-400">
+                            <i class="fa-solid fa-globe"></i>
+                        </div>
+                        <input type="text" name="sas_ip" value="{{ current_ip }}" required
+                               class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder-slate-600 font-mono"
+                               placeholder="193.43.140.218">
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1.5">
+                        {% if session.get('lang', 'ar') == 'ar' %}أدخل عنوان IP أو اسم النطاق بدون https:// (مثال: 193.43.140.218){% else %}Enter IP or domain without https:// (e.g., 193.43.140.218){% endif %}
+                    </p>
+                </div>
+
+                <!-- Admin Username -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        {% if session.get('lang', 'ar') == 'ar' %}اسم مستخدم الأدمن (SAS Admin){% else %}SAS Admin Username{% endif %}
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-indigo-400">
+                            <i class="fa-solid fa-user-shield"></i>
+                        </div>
+                        <input type="text" name="sas_user" value="{{ current_user }}" required
+                               class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder-slate-600"
+                               placeholder="Admin">
+                    </div>
+                </div>
+
+                <!-- Admin Password -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        {% if session.get('lang', 'ar') == 'ar' %}كلمة مرور الأدمن (SAS Admin Password){% else %}SAS Admin Password{% endif %}
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-indigo-400">
+                            <i class="fa-solid fa-key"></i>
+                        </div>
+                        <input type="password" name="sas_pass" id="sas_pass" value="{{ current_pass }}" required
+                               class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl pl-10 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder-slate-600"
+                               placeholder="••••••••">
+                        <button type="button" onclick="togglePass()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-white transition-colors">
+                            <i id="eye-icon" class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex flex-col sm:flex-row gap-3">
+            <button type="submit" name="action" value="save" 
+                    class="flex-1 py-3.5 px-6 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 transition-all duration-300 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-save"></i>
+                {% if session.get('lang', 'ar') == 'ar' %}حفظ الإعدادات{% else %}Save Settings{% endif %}
+            </button>
+            <button type="submit" name="action" value="test" 
+                    class="flex-1 py-3.5 px-6 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all duration-300 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-plug-circle-check"></i>
+                {% if session.get('lang', 'ar') == 'ar' %}اختبار الاتصال{% else %}Test Connection{% endif %}
+            </button>
+            <button type="submit" name="action" value="save_and_sync" 
+                    class="flex-1 py-3.5 px-6 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all duration-300 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-rotate"></i>
+                {% if session.get('lang', 'ar') == 'ar' %}حفظ ومزامنة فوري{% else %}Save & Sync Now{% endif %}
+            </button>
+        </div>
+    </form>
+
+    <!-- Test Result (shown via flash) -->
+    {% if test_result %}
+    <div class="mt-6 glass-panel p-5 rounded-2xl border {% if test_result.success %}border-emerald-500/30 bg-emerald-500/5{% else %}border-red-500/30 bg-red-500/5{% endif %}">
+        <h3 class="font-bold text-sm mb-3 flex items-center gap-2 {% if test_result.success %}text-emerald-400{% else %}text-red-400{% endif %}">
+            <i class="fa-solid {% if test_result.success %}fa-circle-check{% else %}fa-circle-xmark{% endif %}"></i>
+            {% if session.get('lang', 'ar') == 'ar' %}نتيجة اختبار الاتصال{% else %}Connection Test Result{% endif %}
+        </h3>
+        <div class="text-xs font-mono p-3 rounded-lg bg-slate-900/80 border border-slate-700/50 text-slate-300 whitespace-pre-wrap">{{ test_result.detail }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Back Button -->
+    <div class="mt-8 flex justify-center">
+        <a href="{{ url_for('dashboard') }}" class="text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center gap-2">
+            <i class="fa-solid fa-arrow-left"></i>
+            {% if session.get('lang', 'ar') == 'ar' %}العودة للوحة التحكم{% else %}Back to Dashboard{% endif %}
+        </a>
+    </div>
+</div>
+
+<script>
+function togglePass() {
+    const input = document.getElementById('sas_pass');
+    const icon = document.getElementById('eye-icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+</script>
+{% endblock %}
