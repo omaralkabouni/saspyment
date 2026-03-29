@@ -1693,8 +1693,8 @@ def inventory_api_items():
 @app.route('/inventory/reports')
 def inventory_reports():
     if 'token' not in session: return redirect(url_for('login'))
-    if session.get('role') not in ['admin', 'manager']:
-        flash('🚫 غير مصرح.', 'error')
+    if session.get('role') != 'admin':
+        flash('🚫 غير مصرح. هذه الصفحة مخصصة للمدير فقط.', 'error')
         return redirect(url_for('dashboard'))
 
     conn = get_db_connection()
