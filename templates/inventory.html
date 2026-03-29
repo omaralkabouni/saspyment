@@ -1,0 +1,550 @@
+{% extends 'base.html' %}
+{% block title %}المخزون والمحاسبة - Top Net{% endblock %}
+
+{% block content %}
+{% include 'navbar.html' %}
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" dir="rtl">
+    <div class="flex items-center justify-between mb-2">
+        <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+            <i class="fa-solid fa-warehouse text-indigo-400"></i>
+            نظام المخزون والمحاسبة
+        </h1>
+        <div class="flex gap-2">
+            {% if session.get('role') in ['admin', 'manager'] %}
+            <a href="{{ url_for('inventory_reports') }}" class="px-4 py-2 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-lg text-sm font-bold hover:bg-purple-600/30 transition-all">
+                <i class="fa-solid fa-chart-pie ml-1"></i> التقارير
+            </a>
+            {% endif %}
+            <a href="{{ url_for('export_inventory') }}" class="px-4 py-2 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-sm font-bold hover:bg-emerald-600/30 transition-all">
+                <i class="fa-solid fa-download ml-1"></i> تصدير
+            </a>
+        </div>
+    </div>
+    <p class="text-slate-400 text-sm mb-6">إدارة المنتجات والمشتريات والمبيعات مع تتبع المخزون والأرباح</p>
+
+    <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+        <div class="flex items-center gap-2 text-blue-400 text-sm">
+            <i class="fa-solid fa-coins"></i>
+            <span>سعر الصرف الحالي: <strong>1 USD = {{ exchange_rate or 'غير محدد' }} SYP</strong></span>
+        </div>
+        {% if session.get('role') in ['admin', 'manager'] %}
+        <form method="POST" class="flex gap-2 items-center">
+            <input type="hidden" name="action" value="update_rate">
+            <input type="number" step="0.01" min="0" name="exchange_rate" value="{{ exchange_rate }}" placeholder="تحديث السعر..." required
+                class="bg-slate-900 border border-blue-500/30 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-400 w-32 shadow-inner">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-3 py-1 text-sm font-bold transition-colors">
+                حفظ
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <!-- Low Stock Alerts -->
+    {% if low_stock %}
+    <div class="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+        <h3 class="text-red-400 font-bold text-sm mb-2 flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i> تنبيه مخزون منخفض</h3>
+        <div class="flex flex-wrap gap-2">
+            {% for item in low_stock %}
+            <span class="px-3 py-1 rounded-full bg-red-500/20 text-red-300 text-xs font-bold border border-red-500/30">
+                {{ item.name }}: {{ item.stock_qty }} {{ item.unit }}
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="mb-4 p-4 rounded-lg flex items-center gap-2 {% if category == 'success' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% else %}bg-red-500/10 text-red-400 border border-red-500/20{% endif %}">
+            <i class="fa-solid {% if category == 'success' %}fa-check-circle{% else %}fa-circle-exclamation{% endif %}"></i>
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Tabs -->
+    <div class="flex gap-1 mb-6 bg-slate-800/50 p-1 rounded-xl border border-slate-700/50 w-fit">
+        <button onclick="switchTab('items')" id="tab-items" class="tab-btn active px-5 py-2.5 rounded-lg text-sm font-bold transition-all">
+            <i class="fa-solid fa-boxes-stacked ml-1"></i> المنتجات
+        </button>
+        <button onclick="switchTab('purchases')" id="tab-purchases" class="tab-btn px-5 py-2.5 rounded-lg text-sm font-bold transition-all">
+            <i class="fa-solid fa-cart-shopping ml-1"></i> المشتريات
+        </button>
+        <button onclick="switchTab('sales')" id="tab-sales" class="tab-btn px-5 py-2.5 rounded-lg text-sm font-bold transition-all">
+            <i class="fa-solid fa-cash-register ml-1"></i> المبيعات
+        </button>
+    </div>
+
+    <!-- ==================== TAB: PRODUCTS ==================== -->
+    <div id="panel-items" class="tab-panel">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Add Product Form -->
+            {% if session.get('role') in ['admin', 'manager'] %}
+            <div class="lg:col-span-1">
+                <div class="glass-panel shadow-xl rounded-xl p-6 sticky top-24">
+                    <h3 class="text-lg font-bold mb-5 border-b border-white/5 pb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-plus-circle text-indigo-400"></i> إضافة منتج جديد
+                    </h3>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="add_item">
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">اسم المنتج *</label>
+                                <input type="text" name="name" required placeholder="مثال: صحن ستالايت 90cm"
+                                    class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">التصنيف</label>
+                                <select name="category" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                    <option value="أجهزة">أجهزة</option>
+                                    <option value="كابلات">كابلات</option>
+                                    <option value="ملحقات">ملحقات</option>
+                                    <option value="أخرى">أخرى</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">سعر الشراء (Cost)</label>
+                                    <input type="number" step="0.01" name="cost_price" placeholder="0"
+                                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">سعر البيع</label>
+                                    <input type="number" step="0.01" name="sell_price" placeholder="0"
+                                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">الوحدة</label>
+                                    <select name="unit" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                        <option value="قطعة">قطعة</option>
+                                        <option value="متر">متر</option>
+                                        <option value="علبة">علبة</option>
+                                        <option value="لفة">لفة</option>
+                                        <option value="كيلو">كيلو</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">حد أدنى للتنبيه</label>
+                                    <input type="number" name="min_stock" value="5" min="0"
+                                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/20">
+                                <i class="fa-solid fa-plus ml-1"></i> إضافة المنتج
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Products List -->
+            <div class="{% if session.get('role') in ['admin', 'manager'] %}lg:col-span-2{% else %}lg:col-span-3{% endif %}">
+                <div class="overflow-hidden rounded-xl border border-white/10 bg-slate-900/50 shadow-2xl">
+                    <table class="w-full text-right">
+                        <thead>
+                            <tr class="bg-slate-800 text-slate-300 text-xs">
+                                <th class="p-3">المنتج</th>
+                                <th class="p-3">التصنيف</th>
+                                <th class="p-3">التكلفة</th>
+                                <th class="p-3">سعر البيع</th>
+                                <th class="p-3">الربح</th>
+                                <th class="p-3">المخزون</th>
+                                {% if session.get('role') in ['admin', 'manager'] %}
+                                <th class="p-3">إجراء</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            {% for item in items %}
+                            <tr class="hover:bg-white/5 transition-colors {% if item.stock_qty <= item.min_stock %}bg-red-500/5{% endif %}">
+                                <td class="p-3">
+                                    <div class="font-bold text-white text-sm">{{ item.name }}</div>
+                                    <div class="text-[10px] text-slate-500">{{ item.unit }}</div>
+                                </td>
+                                <td class="p-3">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold
+                                        {% if item.category == 'أجهزة' %}bg-blue-500/20 text-blue-400
+                                        {% elif item.category == 'كابلات' %}bg-amber-500/20 text-amber-400
+                                        {% elif item.category == 'ملحقات' %}bg-purple-500/20 text-purple-400
+                                        {% else %}bg-slate-700 text-slate-400{% endif %}">
+                                        {{ item.category or '-' }}
+                                    </span>
+                                </td>
+                                <td class="p-3 text-slate-400 text-sm font-mono">{{ "%.0f"|format(item.cost_price) }}</td>
+                                <td class="p-3 text-emerald-400 text-sm font-bold font-mono">{{ "%.0f"|format(item.sell_price) }}</td>
+                                <td class="p-3 text-sm font-bold font-mono {% if item.sell_price - item.cost_price > 0 %}text-emerald-400{% else %}text-red-400{% endif %}">
+                                    {{ "%.0f"|format(item.sell_price - item.cost_price) }}
+                                </td>
+                                <td class="p-3">
+                                    <span class="font-bold text-sm {% if item.stock_qty <= item.min_stock %}text-red-400{% else %}text-white{% endif %}">
+                                        {{ item.stock_qty }}
+                                    </span>
+                                    <span class="text-[10px] text-slate-500">{{ item.unit }}</span>
+                                </td>
+                                {% if session.get('role') in ['admin', 'manager'] %}
+                                <td class="p-3">
+                                    <div class="flex gap-1">
+                                        <button onclick="openEditModal({{ item.id }}, '{{ item.name }}', '{{ item.category }}', {{ item.cost_price }}, {{ item.sell_price }}, '{{ item.unit }}', {{ item.min_stock }})"
+                                            class="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-all text-xs">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </button>
+                                        <form method="POST" class="inline" onsubmit="return confirm('هل تريد حذف هذا المنتج؟')">
+                                            <input type="hidden" name="action" value="delete_item">
+                                            <input type="hidden" name="item_id" value="{{ item.id }}">
+                                            <button type="submit" class="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all text-xs">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                            {% if not items %}
+                            <tr><td colspan="7" class="p-10 text-center text-slate-500">لا توجد منتجات. قم بإضافة منتج جديد.</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TAB: PURCHASES ==================== -->
+    <div id="panel-purchases" class="tab-panel hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Add Purchase Form -->
+            <div class="lg:col-span-1">
+                <div class="glass-panel shadow-xl rounded-xl p-6 sticky top-24">
+                    <h3 class="text-lg font-bold mb-5 border-b border-white/5 pb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-cart-plus text-emerald-400"></i> تسجيل مشتريات
+                    </h3>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="add_purchase">
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">المنتج *</label>
+                                <select name="item_id" required id="purchase-item-select"
+                                    class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                                    <option value="">اختر المنتج...</option>
+                                    {% for item in items %}
+                                    <option value="{{ item.id }}" data-cost="{{ item.cost_price }}">{{ item.name }} ({{ item.stock_qty }} {{ item.unit }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">الكمية *</label>
+                                    <input type="number" name="quantity" min="1" required placeholder="0" id="purchase-qty"
+                                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">سعر الشراء *</label>
+                                    <input type="number" step="0.01" name="cost_price" required placeholder="0" id="purchase-cost"
+                                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">المورد</label>
+                                <input type="text" name="supplier" placeholder="اسم المورد (اختياري)"
+                                    class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">ملاحظات</label>
+                                <input type="text" name="notes" placeholder="ملاحظات (اختياري)"
+                                    class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <div class="p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                                <div class="text-[10px] text-slate-400">الإجمالي</div>
+                                <div class="text-lg font-bold text-emerald-400" id="purchase-total">0</div>
+                            </div>
+                            <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20">
+                                <i class="fa-solid fa-cart-shopping ml-1"></i> تسجيل المشتريات
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Purchases History -->
+            <div class="lg:col-span-2">
+                <div class="overflow-hidden rounded-xl border border-white/10 bg-slate-900/50 shadow-2xl">
+                    <table class="w-full text-right">
+                        <thead>
+                            <tr class="bg-slate-800 text-slate-300 text-xs">
+                                <th class="p-3">المنتج</th>
+                                <th class="p-3">الكمية</th>
+                                <th class="p-3">سعر الوحدة</th>
+                                <th class="p-3">الإجمالي</th>
+                                <th class="p-3">المورد</th>
+                                <th class="p-3">بواسطة</th>
+                                <th class="p-3">التاريخ</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            {% for p in purchases %}
+                            <tr class="hover:bg-white/5 transition-colors">
+                                <td class="p-3 text-white text-sm font-bold">{{ p.item_name }}</td>
+                                <td class="p-3 text-sm text-white">{{ p.quantity }} {{ p.unit }}</td>
+                                <td class="p-3 text-sm text-slate-400 font-mono">{{ "%.0f"|format(p.cost_price) }}</td>
+                                <td class="p-3 text-sm text-emerald-400 font-bold font-mono">{{ "%.0f"|format(p.total_cost) }}</td>
+                                <td class="p-3 text-sm text-slate-400">{{ p.supplier or '-' }}</td>
+                                <td class="p-3 text-sm text-slate-400">{{ p.admin_name }}</td>
+                                <td class="p-3 text-[10px] text-slate-500">{{ p.created_at[:16] }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% if not purchases %}
+                            <tr><td colspan="7" class="p-10 text-center text-slate-500">لا توجد مشتريات مسجلة.</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TAB: SALES ==================== -->
+    <div id="panel-sales" class="tab-panel hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Add Sale Form -->
+            <div class="lg:col-span-1">
+                <div class="glass-panel shadow-xl rounded-xl p-6 sticky top-24">
+                    <h3 class="text-lg font-bold mb-5 border-b border-white/5 pb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-cash-register text-blue-400"></i> تسجيل بيع
+                    </h3>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="add_sale">
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">المنتج *</label>
+                                <select name="item_id" required id="sale-item-select" onchange="updateSalePrice()"
+                                    class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                    <option value="">اختر المنتج...</option>
+                                    {% for item in items %}
+                                    {% if item.stock_qty > 0 %}
+                                    <option value="{{ item.id }}" data-price="{{ item.sell_price }}" data-stock="{{ item.stock_qty }}">{{ item.name }} (متوفر: {{ item.stock_qty }})</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">الكمية *</label>
+                                    <input type="number" name="quantity" min="1" required placeholder="0" id="sale-qty" oninput="calcSaleTotal()"
+                                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">سعر البيع *</label>
+                                    <input type="number" step="0.01" name="sell_price" required placeholder="0" id="sale-price" oninput="calcSaleTotal()"
+                                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">الحسم (مبلغ)</label>
+                                <input type="number" step="0.01" name="discount" value="0" id="sale-discount" oninput="calcSaleTotal()"
+                                    class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">اسم العميل</label>
+                                <input type="text" name="customer_name" placeholder="اسم العميل (اختياري)"
+                                    class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">ملاحظات</label>
+                                <input type="text" name="notes" placeholder="ملاحظات (اختياري)"
+                                    class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div class="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                                <div class="text-[10px] text-slate-400">الإجمالي بعد الحسم</div>
+                                <div class="text-lg font-bold text-blue-400" id="sale-total">0</div>
+                            </div>
+                            <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/20">
+                                <i class="fa-solid fa-receipt ml-1"></i> تسجيل البيع
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Sales History -->
+            <div class="lg:col-span-2">
+                <div class="overflow-hidden rounded-xl border border-white/10 bg-slate-900/50 shadow-2xl">
+                    <table class="w-full text-right">
+                        <thead>
+                            <tr class="bg-slate-800 text-slate-300 text-xs">
+                                <th class="p-3">المنتج</th>
+                                <th class="p-3">الكمية</th>
+                                <th class="p-3">سعر الوحدة</th>
+                                <th class="p-3">الحسم</th>
+                                <th class="p-3">الإجمالي</th>
+                                <th class="p-3">العميل</th>
+                                <th class="p-3">بواسطة</th>
+                                <th class="p-3">التاريخ</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            {% for s in sales %}
+                            <tr class="hover:bg-white/5 transition-colors">
+                                <td class="p-3 text-white text-sm font-bold">{{ s.item_name }}</td>
+                                <td class="p-3 text-sm text-white">{{ s.quantity }} {{ s.unit }}</td>
+                                <td class="p-3 text-sm text-slate-400 font-mono">{{ "%.0f"|format(s.sell_price) }}</td>
+                                <td class="p-3 text-sm text-amber-400 font-mono">{% if s.discount > 0 %}-{{ "%.0f"|format(s.discount) }}{% else %}-{% endif %}</td>
+                                <td class="p-3 text-sm text-emerald-400 font-bold font-mono">{{ "%.0f"|format(s.total_amount) }}</td>
+                                <td class="p-3 text-sm text-slate-400">{{ s.customer_name or '-' }}</td>
+                                <td class="p-3 text-sm text-slate-400">{{ s.admin_name }}</td>
+                                <td class="p-3 text-[10px] text-slate-500">{{ s.created_at[:16] }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% if not sales %}
+                            <tr><td colspan="8" class="p-10 text-center text-slate-500">لا توجد مبيعات مسجلة.</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Product Modal -->
+<div id="edit-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6" dir="rtl">
+        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-pen-to-square text-blue-400"></i> تعديل المنتج
+        </h3>
+        <form method="POST">
+            <input type="hidden" name="action" value="edit_item">
+            <input type="hidden" name="item_id" id="edit-id">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">اسم المنتج</label>
+                    <input type="text" name="name" id="edit-name" required
+                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">التصنيف</label>
+                    <select name="category" id="edit-category"
+                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                        <option value="أجهزة">أجهزة</option>
+                        <option value="كابلات">كابلات</option>
+                        <option value="ملحقات">ملحقات</option>
+                        <option value="أخرى">أخرى</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">سعر الشراء</label>
+                        <input type="number" step="0.01" name="cost_price" id="edit-cost"
+                            class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">سعر البيع</label>
+                        <input type="number" step="0.01" name="sell_price" id="edit-sell"
+                            class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">الوحدة</label>
+                        <select name="unit" id="edit-unit"
+                            class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                            <option value="قطعة">قطعة</option>
+                            <option value="متر">متر</option>
+                            <option value="علبة">علبة</option>
+                            <option value="لفة">لفة</option>
+                            <option value="كيلو">كيلو</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">حد أدنى</label>
+                        <input type="number" name="min_stock" id="edit-min" min="0"
+                            class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all">
+                        <i class="fa-solid fa-save ml-1"></i> حفظ
+                    </button>
+                    <button type="button" onclick="closeEditModal()" class="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-all">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.tab-btn { color: #94a3b8; }
+.tab-btn.active { background: linear-gradient(135deg, #4f46e5, #6366f1); color: white; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3); }
+</style>
+
+<script>
+function switchTab(tab) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + tab).classList.remove('hidden');
+    document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// Purchase auto-calc
+const purchaseItem = document.getElementById('purchase-item-select');
+if (purchaseItem) {
+    purchaseItem.addEventListener('change', function() {
+        const opt = this.options[this.selectedIndex];
+        const cost = opt.getAttribute('data-cost') || 0;
+        document.getElementById('purchase-cost').value = cost;
+        calcPurchaseTotal();
+    });
+}
+document.getElementById('purchase-qty')?.addEventListener('input', calcPurchaseTotal);
+document.getElementById('purchase-cost')?.addEventListener('input', calcPurchaseTotal);
+
+function calcPurchaseTotal() {
+    const qty = parseFloat(document.getElementById('purchase-qty')?.value || 0);
+    const cost = parseFloat(document.getElementById('purchase-cost')?.value || 0);
+    const el = document.getElementById('purchase-total');
+    if (el) el.textContent = (qty * cost).toLocaleString();
+}
+
+// Sale auto-calc
+function updateSalePrice() {
+    const sel = document.getElementById('sale-item-select');
+    const opt = sel.options[sel.selectedIndex];
+    const price = opt.getAttribute('data-price') || 0;
+    document.getElementById('sale-price').value = price;
+    calcSaleTotal();
+}
+
+function calcSaleTotal() {
+    const qty = parseFloat(document.getElementById('sale-qty')?.value || 0);
+    const price = parseFloat(document.getElementById('sale-price')?.value || 0);
+    const disc = parseFloat(document.getElementById('sale-discount')?.value || 0);
+    const total = (qty * price) - disc;
+    const el = document.getElementById('sale-total');
+    if (el) el.textContent = Math.max(0, total).toLocaleString();
+}
+
+// Edit modal
+function openEditModal(id, name, cat, cost, sell, unit, min) {
+    document.getElementById('edit-id').value = id;
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-category').value = cat;
+    document.getElementById('edit-cost').value = cost;
+    document.getElementById('edit-sell').value = sell;
+    document.getElementById('edit-unit').value = unit;
+    document.getElementById('edit-min').value = min;
+    document.getElementById('edit-modal').classList.remove('hidden');
+}
+function closeEditModal() {
+    document.getElementById('edit-modal').classList.add('hidden');
+}
+</script>
+{% endblock %}

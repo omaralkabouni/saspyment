@@ -372,13 +372,13 @@
 </div>
 
 <!-- Complete Modal -->
-<div id="complete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-    <div class="glass-panel rounded-2xl p-6 w-full max-w-md border border-emerald-500/20 shadow-2xl" dir="rtl">
+<div id="complete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+    <div class="glass-panel rounded-2xl p-6 w-full max-w-lg border border-emerald-500/20 shadow-2xl my-8" dir="rtl">
         <h3 class="text-lg font-bold text-white mb-1 flex items-center gap-2">
             <i class="fa-solid fa-receipt text-emerald-400"></i>
             انهاء التركيب وتسجيل الدفعة
         </h3>
-        <p class="text-sm text-slate-400 mb-5">أدخل مبلغ الفاتورة وأي ملاحظات قبل إغلاق الطلب</p>
+        <p class="text-sm text-slate-400 mb-5">أدخل مبلغ الفاتورة واختر البنود المستخدمة من المخزون</p>
         <form method="POST" action="{{ url_for('installations') }}" id="complete-form">
             <input type="hidden" name="action" value="complete">
             <input type="hidden" name="inst_id" id="complete-inst-id">
@@ -400,21 +400,65 @@
                             class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors">
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">المبلغ بالدولار ($)</label>
-                        <input type="number" name="payment_amount_usd" min="0" step="0.01" placeholder="مثال: 50"
+                        <input type="number" name="payment_amount_usd" id="payment-usd" min="0" step="0.01" placeholder="مثال: 50"
                             class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors">
                     </div>
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">المبلغ بالليرة (ل.س)</label>
-                        <input type="number" name="payment_amount_syp" min="0" step="500" placeholder="مثال: 50000"
+                        <input type="number" name="payment_amount_syp" id="payment-syp" min="0" step="500" placeholder="مثال: 50000"
+                            class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">الحسم ($)</label>
+                        <input type="number" name="discount" id="payment-discount" min="0" step="0.01" placeholder="قيمة الحسم" oninput="calcItemsTotal()"
                             class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors">
                     </div>
                 </div>
+
+                <!-- Inventory Items Section -->
+                <div class="border border-indigo-500/20 rounded-xl p-4 bg-indigo-500/5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-bold text-indigo-400 flex items-center gap-2">
+                            <i class="fa-solid fa-boxes-stacked"></i> البنود المستخدمة (من المخزون)
+                        </h4>
+                        <button type="button" onclick="addItemRow()" class="text-xs px-2 py-1 bg-indigo-600/30 text-indigo-300 rounded-lg hover:bg-indigo-600/50 transition-all border border-indigo-500/30">
+                            <i class="fa-solid fa-plus ml-1"></i> إضافة بند
+                        </button>
+                    </div>
+                    <div id="items-container" class="space-y-2">
+                        <!-- Dynamic rows will be added here -->
+                    </div>
+                    <div id="items-empty" class="text-center text-slate-500 text-xs py-3">
+                        اضغط "إضافة بند" لاختيار قطع من المخزون
+                    </div>
+                    <div class="mt-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 flex flex-col gap-2">
+                        <div class="flex justify-between items-center pb-2 border-b border-slate-700/50">
+                            <span class="text-[10px] text-slate-400 font-bold">إجمالي تكلفة البنود:</span>
+                            <div class="flex items-center gap-3">
+                                <span class="text-sm font-bold text-slate-300" id="items-total-usd">$0.00</span>
+                                <span class="text-xs font-bold text-slate-400" id="items-total-syp">0 ل.س</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center text-rose-400 hidden" id="discount-row">
+                            <span class="text-[10px] font-bold">الحسم المطبق:</span>
+                            <span class="text-xs font-bold" id="discount-display-usd">-$0.00</span>
+                        </div>
+                        <div class="flex justify-between items-center pt-1">
+                            <span class="text-xs text-emerald-400 font-bold">المطلوب سداده بعد الحسم:</span>
+                            <div class="flex items-center gap-3">
+                                <span class="text-base font-black text-emerald-400" id="net-total-usd">$0.00</span>
+                                <span class="text-sm font-black text-blue-400" id="net-total-syp">0 ل.س</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">ملاحظات الفاتورة</label>
-                    <textarea name="payment_notes" rows="3" placeholder="تفاصيل عن الدفعة أو العمل المنجز..."
+                    <textarea name="payment_notes" rows="2" placeholder="تفاصيل عن الدفعة أو العمل المنجز..."
                         class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors resize-none"></textarea>
                 </div>
                 <div class="flex gap-3 pt-1">
@@ -496,12 +540,124 @@
 
 {% block extra_scripts %}
 <script>
+let inventoryItems = [];
+let itemRowCount = 0;
+
+// Fetch inventory items on page load
+fetch('/inventory/api/items')
+    .then(r => r.json())
+    .then(data => { inventoryItems = data; })
+    .catch(e => console.log('Could not load inventory items'));
+
 function openCompleteModal(instId) {
     document.getElementById('complete-inst-id').value = instId;
     document.getElementById('complete-modal').classList.remove('hidden');
+    // Reset items
+    document.getElementById('items-container').innerHTML = '';
+    document.getElementById('items-empty').classList.remove('hidden');
+    document.getElementById('items-total-usd').textContent = '$0.00';
+    document.getElementById('items-total-syp').textContent = '0 ل.س';
+    document.getElementById('discount-row').classList.add('hidden');
+    document.getElementById('net-total-usd').textContent = '$0.00';
+    document.getElementById('net-total-syp').textContent = '0 ل.س';
+    document.getElementById('payment-usd').value = '';
+    document.getElementById('payment-syp').value = '';
+    document.getElementById('payment-discount').value = '';
+    itemRowCount = 0;
 }
 function closeCompleteModal() {
     document.getElementById('complete-modal').classList.add('hidden');
+}
+
+const appExchangeRate = parseFloat("{{ exchange_rate|default(0) }}") || 0;
+
+function addItemRow() {
+    const container = document.getElementById('items-container');
+    document.getElementById('items-empty').classList.add('hidden');
+    const idx = itemRowCount++;
+    
+    let optionsHtml = '<option value="">اختر البند...</option>';
+    inventoryItems.forEach(item => {
+        optionsHtml += `<option value="${item.id}" data-price="${item.sell_price}" data-stock="${item.stock_qty}" data-name="${item.name}">${item.name} (${item.stock_qty} ${item.unit})</option>`;
+    });
+
+    const row = document.createElement('div');
+    row.className = 'flex gap-2 items-center bg-slate-800/30 rounded-lg p-2 border border-slate-700/50';
+    row.id = `item-row-${idx}`;
+    row.innerHTML = `
+        <select name="inv_item_id[]" onchange="onItemSelect(${idx})" id="sel-${idx}"
+            class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+            ${optionsHtml}
+        </select>
+        <input type="number" name="inv_qty[]" min="1" value="1" id="qty-${idx}" oninput="calcItemsTotal()"
+            class="w-16 bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-xs text-white text-center focus:outline-none focus:border-indigo-500">
+        <div class="flex flex-col items-center justify-center w-24">
+            <span class="text-[11px] text-emerald-400 font-bold" id="price-usd-${idx}">$0.00</span>
+            <span class="text-[9px] text-blue-400" id="price-syp-${idx}">0 ل.س</span>
+        </div>
+        <button type="button" onclick="removeItemRow(${idx})" class="p-1.5 text-red-400 hover:text-red-300 transition-colors">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    `;
+    container.appendChild(row);
+}
+
+function removeItemRow(idx) {
+    const row = document.getElementById(`item-row-${idx}`);
+    if (row) row.remove();
+    calcItemsTotal();
+    const container = document.getElementById('items-container');
+    if (container.children.length === 0) {
+        document.getElementById('items-empty').classList.remove('hidden');
+    }
+}
+
+function onItemSelect(idx) {
+    const sel = document.getElementById(`sel-${idx}`);
+    const opt = sel.options[sel.selectedIndex];
+    const price = parseFloat(opt.getAttribute('data-price') || 0);
+    const stock = parseInt(opt.getAttribute('data-stock') || 0);
+    const qtyInput = document.getElementById(`qty-${idx}`);
+    qtyInput.max = stock;
+    if (parseInt(qtyInput.value) > stock) qtyInput.value = stock;
+    
+    document.getElementById(`price-usd-${idx}`).textContent = '$' + price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById(`price-syp-${idx}`).textContent = (price * appExchangeRate).toLocaleString() + ' ل.س';
+    calcItemsTotal();
+}
+
+function calcItemsTotal() {
+    let totalUsd = 0;
+    const container = document.getElementById('items-container');
+    container.querySelectorAll('[id^="item-row-"]').forEach(row => {
+        const sel = row.querySelector('select');
+        const qty = parseInt(row.querySelector('input[type="number"]').value || 0);
+        if (sel.selectedIndex >= 0) {
+            const opt = sel.options[sel.selectedIndex];
+            const price = parseFloat(opt?.getAttribute('data-price') || 0);
+            totalUsd += price * qty;
+        }
+    });
+    
+    document.getElementById('items-total-usd').textContent = '$' + totalUsd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('items-total-syp').textContent = (totalUsd * appExchangeRate).toLocaleString() + ' ل.س';
+    
+    const discountVal = parseFloat(document.getElementById('payment-discount').value) || 0;
+    if (discountVal > 0) {
+        document.getElementById('discount-row').classList.remove('hidden');
+        document.getElementById('discount-display-usd').textContent = '-$' + discountVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    } else {
+        document.getElementById('discount-row').classList.add('hidden');
+    }
+    
+    const finalUsd = Math.max(0, totalUsd - discountVal);
+    document.getElementById('net-total-usd').textContent = '$' + finalUsd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('net-total-syp').textContent = Math.round(finalUsd * appExchangeRate).toLocaleString() + ' ل.س';
+    
+    if (totalUsd > 0 || discountVal > 0) {
+        document.getElementById('payment-usd').value = finalUsd.toFixed(2);
+        document.getElementById('payment-syp').value = Math.round(finalUsd * appExchangeRate);
+    }
 }
 
 function openEditModal(inst) {

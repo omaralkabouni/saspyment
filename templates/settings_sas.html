@@ -127,6 +127,30 @@
             </div>
         </div>
 
+        <!-- Exchange Rate Card -->
+        <div class="glass-panel p-6 rounded-2xl border border-slate-700/50 shadow-2xl bg-gradient-to-br from-amber-500/5 to-transparent">
+            <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-700/50 pb-3">
+                <i class="fa-solid fa-coins text-amber-400"></i>
+                {% if session.get('lang', 'ar') == 'ar' %}سعر صرف الدولار{% else %}USD Exchange Rate{% endif %}
+            </h2>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    {% if session.get('lang', 'ar') == 'ar' %}1 دولار = كم ليرة سورية{% else %}1 USD = ? SYP{% endif %}
+                </label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-amber-400">
+                        <i class="fa-solid fa-dollar-sign"></i>
+                    </div>
+                    <input type="number" step="0.01" name="exchange_rate" value="{{ exchange_rate }}"
+                           class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all placeholder-slate-600 font-mono"
+                           placeholder="14500">
+                </div>
+                <p class="text-[10px] text-slate-500 mt-1.5">
+                    {% if session.get('lang', 'ar') == 'ar' %}سيتم استخدامه لتحويل الأسعار في صفحات المخزون والتقارير{% else %}Used for currency conversion in inventory and reports{% endif %}
+                </p>
+            </div>
+        </div>
+
         <!-- Actions -->
         <div class="flex flex-col sm:flex-row gap-3">
             <button type="submit" name="action" value="save" 

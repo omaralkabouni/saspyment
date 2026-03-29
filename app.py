@@ -252,6 +252,54 @@ def init_db():
         )
     ''')
 
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS inventory_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            category TEXT DEFAULT '',
+            cost_price REAL DEFAULT 0,
+            sell_price REAL DEFAULT 0,
+            stock_qty INTEGER DEFAULT 0,
+            min_stock INTEGER DEFAULT 0,
+            unit TEXT DEFAULT 'قطعة',
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS inventory_purchases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id INTEGER NOT NULL,
+            quantity INTEGER NOT NULL,
+            cost_price REAL NOT NULL,
+            total_cost REAL NOT NULL,
+            supplier TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            admin_name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (item_id) REFERENCES inventory_items (id)
+        )
+    ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS inventory_sales (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id INTEGER NOT NULL,
+            quantity INTEGER NOT NULL,
+            sell_price REAL NOT NULL,
+            discount REAL DEFAULT 0,
+            total_amount REAL NOT NULL,
+            installation_id INTEGER,
+            customer_name TEXT DEFAULT '',
+            admin_name TEXT,
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (item_id) REFERENCES inventory_items (id)
+        )
+    ''')
+
+
     # 2. Run Migrations (Adding columns if they don't exist)
     migrations = [
         ("payments_v3", "phone", "TEXT"),
@@ -1236,6 +1284,12 @@ def settings_sas():
             conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('sas_ip', ?)", (new_ip,))
             conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('sas_user', ?)", (new_user,))
             conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('sas_pass', ?)", (new_pass,))
+            
+            # Save exchange rate
+            exchange_rate = request.form.get('exchange_rate', '').strip()
+            if exchange_rate:
+                conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('exchange_rate', ?)", (exchange_rate,))
+            
             conn.commit()
 
             # Update global variables
@@ -1263,11 +1317,13 @@ def settings_sas():
     sas_ip_row = conn.execute("SELECT value FROM settings WHERE key = 'sas_ip'").fetchone()
     sas_user_row = conn.execute("SELECT value FROM settings WHERE key = 'sas_user'").fetchone()
     sas_pass_row = conn.execute("SELECT value FROM settings WHERE key = 'sas_pass'").fetchone()
+    rate_row = conn.execute("SELECT value FROM settings WHERE key = 'exchange_rate'").fetchone()
     conn.close()
 
     current_ip = sas_ip_row['value'] if sas_ip_row else SAS_API_IP
     current_user = sas_user_row['value'] if sas_user_row else SAS_ADMIN_USER
     current_pass = sas_pass_row['value'] if sas_pass_row else SAS_ADMIN_PASS
+    exchange_rate = rate_row['value'] if rate_row else ''
 
     # Last sync time
     last_sync = None
@@ -1279,7 +1335,8 @@ def settings_sas():
         current_user=current_user,
         current_pass=current_pass,
         last_sync=last_sync,
-        test_result=test_result
+        test_result=test_result,
+        exchange_rate=exchange_rate
     )
 
 @app.route('/settings/webhook', methods=['GET', 'POST'])
@@ -1482,6 +1539,270 @@ def export_expenses():
     
     return Response(csv_data_with_bom, mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f"attachment;filename={filename}"})
 
+# =============================================
+#  INVENTORY & ACCOUNTING MODULE
+# =============================================
+
+@app.route('/inventory', methods=['GET', 'POST'])
+def inventory():
+    if 'token' not in session: return redirect(url_for('login'))
+    if session.get('role') == 'maintenance':
+        return redirect(url_for('complaints'))
+
+    conn = get_db_connection()
+    user_role = session.get('role')
+    user_name = session.get('username')
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'update_rate' and user_role in ['admin', 'manager']:
+            new_rate = request.form.get('exchange_rate', '').strip()
+            if new_rate:
+                conn.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ('exchange_rate', new_rate))
+                conn.commit()
+                flash('✅ تم تحديث سعر الصرف بنجاح.', 'success')
+
+        elif action == 'add_item' and user_role in ['admin', 'manager']:
+            name = request.form.get('name', '').strip()
+            category = request.form.get('category', '').strip()
+            cost_price = float(request.form.get('cost_price', 0) or 0)
+            sell_price = float(request.form.get('sell_price', 0) or 0)
+            unit = request.form.get('unit', 'قطعة').strip()
+            min_stock = int(request.form.get('min_stock', 0) or 0)
+            if name:
+                conn.execute('''
+                    INSERT INTO inventory_items (name, category, cost_price, sell_price, unit, min_stock)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (name, category, cost_price, sell_price, unit, min_stock))
+                conn.commit()
+                flash('✅ تم إضافة المنتج بنجاح.', 'success')
+            else:
+                flash('❌ يرجى إدخال اسم المنتج.', 'error')
+
+        elif action == 'edit_item' and user_role in ['admin', 'manager']:
+            item_id = request.form.get('item_id')
+            name = request.form.get('name', '').strip()
+            category = request.form.get('category', '').strip()
+            cost_price = float(request.form.get('cost_price', 0) or 0)
+            sell_price = float(request.form.get('sell_price', 0) or 0)
+            unit = request.form.get('unit', 'قطعة').strip()
+            min_stock = int(request.form.get('min_stock', 0) or 0)
+            conn.execute('''
+                UPDATE inventory_items SET name=?, category=?, cost_price=?, sell_price=?, unit=?, min_stock=?
+                WHERE id=?
+            ''', (name, category, cost_price, sell_price, unit, min_stock, item_id))
+            conn.commit()
+            flash('✅ تم تحديث المنتج.', 'success')
+
+        elif action == 'delete_item' and user_role in ['admin', 'manager']:
+            item_id = request.form.get('item_id')
+            conn.execute('DELETE FROM inventory_items WHERE id = ?', (item_id,))
+            conn.commit()
+            flash('🗑️ تم حذف المنتج.', 'success')
+
+        elif action == 'add_purchase':
+            item_id = int(request.form.get('item_id', 0))
+            quantity = int(request.form.get('quantity', 0) or 0)
+            cost_price = float(request.form.get('cost_price', 0) or 0)
+            supplier = request.form.get('supplier', '').strip()
+            notes = request.form.get('notes', '').strip()
+            total_cost = quantity * cost_price
+            if item_id and quantity > 0:
+                conn.execute('''
+                    INSERT INTO inventory_purchases (item_id, quantity, cost_price, total_cost, supplier, notes, admin_name)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (item_id, quantity, cost_price, total_cost, supplier, notes, user_name))
+                # Update stock quantity
+                conn.execute('UPDATE inventory_items SET stock_qty = stock_qty + ? WHERE id = ?', (quantity, item_id))
+                # Update cost price if changed
+                if cost_price > 0:
+                    conn.execute('UPDATE inventory_items SET cost_price = ? WHERE id = ?', (cost_price, item_id))
+                conn.commit()
+                flash(f'✅ تم تسجيل شراء {quantity} وحدة وتحديث المخزون.', 'success')
+            else:
+                flash('❌ يرجى اختيار المنتج والكمية.', 'error')
+
+        elif action == 'add_sale':
+            item_id = int(request.form.get('item_id', 0))
+            quantity = int(request.form.get('quantity', 0) or 0)
+            sell_price = float(request.form.get('sell_price', 0) or 0)
+            discount = float(request.form.get('discount', 0) or 0)
+            customer_name = request.form.get('customer_name', '').strip()
+            notes = request.form.get('notes', '').strip()
+            total_amount = (sell_price * quantity) - discount
+            if item_id and quantity > 0:
+                # Check stock
+                item = conn.execute('SELECT stock_qty FROM inventory_items WHERE id = ?', (item_id,)).fetchone()
+                if item and item['stock_qty'] >= quantity:
+                    conn.execute('''
+                        INSERT INTO inventory_sales (item_id, quantity, sell_price, discount, total_amount, customer_name, admin_name, notes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (item_id, quantity, sell_price, discount, total_amount, customer_name, user_name, notes))
+                    conn.execute('UPDATE inventory_items SET stock_qty = stock_qty - ? WHERE id = ?', (quantity, item_id))
+                    conn.commit()
+                    flash(f'✅ تم تسجيل بيع {quantity} وحدة.', 'success')
+                else:
+                    flash(f'❌ الكمية المطلوبة ({quantity}) أكثر من المتوفر ({item["stock_qty"] if item else 0}).', 'error')
+            else:
+                flash('❌ يرجى اختيار المنتج والكمية.', 'error')
+
+        return redirect(url_for('inventory'))
+
+    # GET - Load data
+    items = conn.execute('SELECT * FROM inventory_items ORDER BY name').fetchall()
+    
+    # Recent purchases with item names
+    purchases = conn.execute('''
+        SELECT p.*, i.name as item_name, i.unit 
+        FROM inventory_purchases p 
+        JOIN inventory_items i ON p.item_id = i.id 
+        ORDER BY p.created_at DESC LIMIT 50
+    ''').fetchall()
+
+    # Recent sales with item names
+    sales = conn.execute('''
+        SELECT s.*, i.name as item_name, i.unit, i.cost_price as item_cost
+        FROM inventory_sales s 
+        JOIN inventory_items i ON s.item_id = i.id 
+        ORDER BY s.created_at DESC LIMIT 50
+    ''').fetchall()
+
+    # Low stock alerts
+    low_stock = conn.execute('SELECT * FROM inventory_items WHERE stock_qty <= min_stock AND is_active = 1').fetchall()
+
+    # Exchange rate
+    rate_row = conn.execute("SELECT value FROM settings WHERE key = 'exchange_rate'").fetchone()
+    exchange_rate = float(rate_row['value']) if rate_row else 0
+
+    conn.close()
+
+    return render_template('inventory.html', 
+        items=items, purchases=purchases, sales=sales, 
+        low_stock=low_stock, exchange_rate=exchange_rate)
+
+@app.route('/inventory/api/items')
+def inventory_api_items():
+    """JSON API for getting inventory items (used by installation completion modal)."""
+    if 'token' not in session: return json.dumps([]), 401
+    conn = get_db_connection()
+    items = conn.execute('SELECT id, name, sell_price, stock_qty, unit FROM inventory_items WHERE is_active = 1 AND stock_qty > 0 ORDER BY name').fetchall()
+    conn.close()
+    return json.dumps([dict(i) for i in items])
+
+@app.route('/inventory/reports')
+def inventory_reports():
+    if 'token' not in session: return redirect(url_for('login'))
+    if session.get('role') not in ['admin', 'manager']:
+        flash('🚫 غير مصرح.', 'error')
+        return redirect(url_for('dashboard'))
+
+    conn = get_db_connection()
+    
+    # Overall stats
+    total_items = conn.execute('SELECT COUNT(*) FROM inventory_items WHERE is_active = 1').fetchone()[0]
+    total_stock_value = conn.execute('SELECT COALESCE(SUM(cost_price * stock_qty), 0) FROM inventory_items WHERE is_active = 1').fetchone()[0]
+    total_purchases = conn.execute('SELECT COALESCE(SUM(total_cost), 0) FROM inventory_purchases').fetchone()[0]
+    total_sales_amount = conn.execute('SELECT COALESCE(SUM(total_amount), 0) FROM inventory_sales').fetchone()[0]
+    total_sales_cost = conn.execute('''
+        SELECT COALESCE(SUM(s.quantity * i.cost_price), 0) 
+        FROM inventory_sales s JOIN inventory_items i ON s.item_id = i.id
+    ''').fetchone()[0]
+    total_profit = total_sales_amount - total_sales_cost
+
+    # Items with profit details
+    items_report = conn.execute('''
+        SELECT i.*, 
+            COALESCE((SELECT SUM(p.quantity) FROM inventory_purchases p WHERE p.item_id = i.id), 0) as total_purchased,
+            COALESCE((SELECT SUM(s.quantity) FROM inventory_sales s WHERE s.item_id = i.id), 0) as total_sold,
+            COALESCE((SELECT SUM(s.total_amount) FROM inventory_sales s WHERE s.item_id = i.id), 0) as revenue,
+            COALESCE((SELECT SUM(s.quantity * i.cost_price) FROM inventory_sales s WHERE s.item_id = i.id), 0) as cost_of_sold
+        FROM inventory_items i 
+        ORDER BY total_sold DESC
+    ''').fetchall()
+
+    # Monthly breakdown
+    monthly_sales = conn.execute('''
+        SELECT strftime('%Y-%m', s.created_at) as month,
+            SUM(s.total_amount) as revenue,
+            SUM(s.quantity * i.cost_price) as cost,
+            SUM(s.total_amount) - SUM(s.quantity * i.cost_price) as profit
+        FROM inventory_sales s 
+        JOIN inventory_items i ON s.item_id = i.id
+        GROUP BY month ORDER BY month DESC LIMIT 12
+    ''').fetchall()
+
+    # Exchange rate
+    rate_row = conn.execute("SELECT value FROM settings WHERE key = 'exchange_rate'").fetchone()
+    exchange_rate = float(rate_row['value']) if rate_row else 0
+
+    conn.close()
+
+    return render_template('inventory_reports.html',
+        total_items=total_items, total_stock_value=total_stock_value,
+        total_purchases=total_purchases, total_sales_amount=total_sales_amount,
+        total_profit=total_profit, items_report=items_report,
+        monthly_sales=monthly_sales, exchange_rate=exchange_rate)
+
+@app.route('/inventory/export')
+def export_inventory():
+    if 'token' not in session: return redirect(url_for('login'))
+    conn = get_db_connection()
+    items = conn.execute('SELECT * FROM inventory_items ORDER BY name').fetchall()
+    conn.close()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Category', 'Cost Price', 'Sell Price', 'Stock', 'Unit', 'Min Stock'])
+    for i in items:
+        writer.writerow([i['id'], i['name'], i['category'], i['cost_price'], i['sell_price'], i['stock_qty'], i['unit'], i['min_stock']])
+    csv_data = '\ufeff' + output.getvalue()
+    return Response(csv_data, mimetype='text/csv', headers={'Content-Disposition': f'attachment;filename=inventory_{datetime.now().strftime("%Y-%m-%d")}.csv'})
+
+@app.route('/inventory/sale/from-installation', methods=['POST'])
+def inventory_sale_from_installation():
+    """Record inventory sales linked to an installation (called via AJAX or form submission)."""
+    if 'token' not in session:
+        return json.dumps({'error': 'Unauthorized'}), 401
+
+    installation_id = request.form.get('installation_id')
+    items_json = request.form.get('items_json', '[]')
+    admin_name = session.get('username', 'Unknown')
+
+    try:
+        sale_items = json.loads(items_json)
+    except (json.JSONDecodeError, TypeError):
+        sale_items = []
+
+    if not sale_items:
+        return json.dumps({'status': 'ok', 'message': 'No items to record'}), 200
+
+    conn = get_db_connection()
+    total_sale = 0
+
+    for si in sale_items:
+        item_id = si.get('item_id')
+        quantity = int(si.get('quantity', 0))
+        sell_price = float(si.get('sell_price', 0))
+        discount = float(si.get('discount', 0))
+
+        if item_id and quantity > 0:
+            item = conn.execute('SELECT stock_qty, name FROM inventory_items WHERE id = ?', (item_id,)).fetchone()
+            if item and item['stock_qty'] >= quantity:
+                total_amount = (quantity * sell_price) - discount
+                if total_amount < 0:
+                    total_amount = 0
+                conn.execute('''
+                    INSERT INTO inventory_sales (item_id, quantity, sell_price, discount, total_amount, installation_id, admin_name, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (item_id, quantity, sell_price, discount, total_amount, installation_id, admin_name, f'تركيب #{installation_id}'))
+                conn.execute('UPDATE inventory_items SET stock_qty = stock_qty - ? WHERE id = ?', (quantity, item_id))
+                total_sale += total_amount
+
+    conn.commit()
+    conn.close()
+
+    return json.dumps({'status': 'ok', 'total_sale': total_sale}), 200, {'Content-Type': 'application/json'}
+
 @app.route('/report')
 def report():
     if 'token' not in session: return redirect(url_for('login'))
@@ -1519,12 +1840,15 @@ def report():
         WHERE status = 'Completed' AND date(updated_at) BETWEEN ? AND ?
     """, (start_date, end_date)).fetchone()
     
-    installations_income_usd = inst_revenue['total_usd']
-    installations_income_syp = inst_revenue['total_syp']
+    rate_row = conn.execute("SELECT value FROM settings WHERE key = 'exchange_rate'").fetchone()
+    exchange_rate = float(rate_row['value']) if rate_row and float(rate_row['value']) > 0 else 1.0
+
+    installations_income_usd = 0
+    installations_income_syp = inst_revenue['total_syp'] + (inst_revenue['total_usd'] * exchange_rate)
     
-    # Total income (Subscribers only SYP for now + Installations SYP/USD)
+    # Total income
     income_total_syp = subscriber_income + installations_income_syp
-    income_total_usd = installations_income_usd
+    income_total_usd = 0
 
     # Installations Count
     installations_count = conn.execute(
@@ -1573,8 +1897,8 @@ def report():
     for row in daily_income:
         if row['day'] not in day_map:
             day_map[row['day']] = {'income_syp': 0, 'income_usd': 0, 'expense': 0}
-        day_map[row['day']]['income_syp'] = row['total_syp']
-        day_map[row['day']]['income_usd'] = row['total_usd']
+        day_map[row['day']]['income_syp'] += row['total_syp'] + (row['total_usd'] * exchange_rate)
+        day_map[row['day']]['income_usd'] = 0
     for row in daily_expense:
         if row['day'] not in day_map:
             day_map[row['day']] = {'income_syp': 0, 'income_usd': 0, 'expense': 0}
@@ -1584,10 +1908,10 @@ def report():
         {
             'day': d, 
             'income_syp': v['income_syp'], 
-            'income_usd': v['income_usd'],
+            'income_usd': 0,
             'expense': v['expense'], 
             'net_syp': v['income_syp'] - v['expense'],
-            'net_usd': v['income_usd']
+            'net_usd': 0
         }
         for d, v in day_map.items()
     ], key=lambda x: x['day'], reverse=True)
@@ -1873,9 +2197,16 @@ def complaints():
             
             # Security: Prevent maintenance from updating already Resolved/Closed complaints
             current_complaint = conn.execute('SELECT * FROM complaints WHERE id = ?', (c_id,)).fetchone()
-            if current_complaint and current_complaint['status'] in ['Resolved', 'Closed'] and user_role == 'maintenance':
-                flash('🚫 لا يمكن تعديل الشكوى بعد الإصلاح أو الإغلاق من قبل موظف الصيانة.', 'error')
-                return redirect(url_for('complaints'))
+            if current_complaint and user_role == 'maintenance':
+                if current_complaint['status'] in ['Resolved', 'Closed']:
+                    flash('🚫 لا يمكن تعديل الشكوى بعد الإصلاح أو الإغلاق من قبل موظف الصيانة.', 'error')
+                    return redirect(url_for('complaints'))
+                
+                # Security: Prevent maintenance from updating complaints assigned to someone else
+                assigned = current_complaint['assigned_to']
+                if assigned and str(assigned).strip() and assigned != user_name:
+                    flash('🚫 هذه الشكوى محالة لموظف صيانة آخر، لا يمكنك تعديلها.', 'error')
+                    return redirect(url_for('complaints'))
             
             # Maintenance users add their ID to the record
             m_user = conn.execute('SELECT maintenance_id FROM users WHERE username = ?', (user_name,)).fetchone()
@@ -1948,6 +2279,11 @@ def complaints():
         elif action == 'assign_self':
             c_id = request.form.get('complaint_id')
             if user_role == 'maintenance':
+                current_c = conn.execute('SELECT assigned_to, status FROM complaints WHERE id = ?', (c_id,)).fetchone()
+                if current_c and current_c['assigned_to'] and str(current_c['assigned_to']).strip() and current_c['assigned_to'] != user_name:
+                    flash('🚫 المهمة محالة بالفعل لموظف آخر ولا يمكنك استلامها.', 'error')
+                    return redirect(url_for('complaints'))
+
                 conn.execute('UPDATE complaints SET assigned_to = ? WHERE id = ?', (user_name, c_id))
                 conn.commit()
                 
@@ -2255,7 +2591,28 @@ def installations():
             connection_type = request.form.get('connection_type', '')
             dish_ip = request.form.get('dish_ip', '')
             inst = conn.execute('SELECT * FROM installations WHERE id = ?', (inst_id,)).fetchone()
+            
+            inv_item_ids = request.form.getlist('inv_item_id[]')
+            inv_qtys = request.form.getlist('inv_qty[]')
+
             if inst and (user_role in ['admin', 'manager'] or inst['assigned_to'] == user_name):
+                # Process inventory items used during installation
+                total_items_cost = 0
+                for item_id, qty_str in zip(inv_item_ids, inv_qtys):
+                    if item_id and qty_str.isdigit():
+                        qty = int(qty_str)
+                        if qty > 0:
+                            item = conn.execute('SELECT id, stock_qty, sell_price, name FROM inventory_items WHERE id = ?', (item_id,)).fetchone()
+                            if item and item['stock_qty'] >= qty:
+                                sell_price = item['sell_price']
+                                total_amount = qty * sell_price
+                                conn.execute('''
+                                    INSERT INTO inventory_sales (item_id, quantity, sell_price, discount, total_amount, installation_id, admin_name, notes)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                ''', (item['id'], qty, sell_price, 0, total_amount, inst_id, user_name, f'مستهلك بتركيب #{inst_id}'))
+                                conn.execute('UPDATE inventory_items SET stock_qty = stock_qty - ? WHERE id = ?', (qty, item['id']))
+                                total_items_cost += total_amount
+
                 conn.execute('''
                     UPDATE installations
                     SET status = "Completed", 
@@ -2271,11 +2628,17 @@ def installations():
                 
                 # Send Webhook Notification for Installation Completion
                 emp = conn.execute('SELECT phone, username, maintenance_id FROM users WHERE username = ?', (inst['assigned_to'] or '',)).fetchone() if inst['assigned_to'] else None
+                
+                discount = float(request.form.get('discount', 0) or 0)
                 send_webhook_async({
                     'id': inst_id,
                     'type': 'installation_completed',
                     'connection_type': connection_type,
                     'dish_ip': dish_ip,
+                    'payment_amount_usd': float(payment_amount_usd),
+                    'payment_amount_syp': float(payment_amount_syp),
+                    'discount': discount,
+                    'total_items_cost': total_items_cost,
                     'public_token': inst['public_token']
                 }, webhook_type='installations', event_name='complete', base_url=request.host_url)
 
@@ -2328,8 +2691,12 @@ def installations():
         'total_revenue_usd': conn.execute('SELECT COALESCE(SUM(payment_amount_usd),0) FROM installations WHERE status = "Completed"').fetchone()[0],
         'total_revenue_syp': conn.execute('SELECT COALESCE(SUM(payment_amount_syp),0) FROM installations WHERE status = "Completed"').fetchone()[0],
     }
+
+    rate_row = conn.execute("SELECT value FROM settings WHERE key = 'exchange_rate'").fetchone()
+    exchange_rate = float(rate_row['value']) if rate_row and rate_row['value'] else 0
+
     conn.close()
-    return render_template('installations.html', installations=all_installations, maintenance_users=maintenance_users, stats=stats)
+    return render_template('installations.html', installations=all_installations, maintenance_users=maintenance_users, stats=stats, exchange_rate=exchange_rate)
 
 @app.route('/installations/export')
 def export_installations():

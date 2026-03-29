@@ -93,20 +93,35 @@
                 <form method="POST" class="space-y-4">
                     <input type="hidden" name="action" value="add">
                     
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">بحث عن المشترك</label>
-                        <select id="user-select" name="username" required>
-                            <option value="">Search by username or name...</option>
-                            {% for user in all_users %}
-                                <option value="{{ user.username }}" 
-                                        data-fullname="{{ user.firstname or '' }} {{ user.lastname or '' }}" 
-                                        data-phone="{{ user.mobile or user.phone or '' }}"
-                                        data-connection-type="{{ user.connection_type or '' }}"
-                                        data-dish-ip="{{ user.dish_ip or '' }}">
-                                    {{ user.username }} ({{ user.firstname or '' }} {{ user.lastname or '' }})
-                                </option>
-                            {% endfor %}
-                        </select>
+                    <div class="relative">
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex justify-between">
+                            <span>بحث عن المشترك</span>
+                            <button type="button" onclick="location.reload()" class="text-[10px] text-blue-400 hover:underline">
+                                <i class="fa-solid fa-rotate mr-1"></i> تحديث القائمة
+                            </button>
+                        </label>
+                        <div class="flex gap-2">
+                            <div class="flex-grow">
+                                <select id="user-select" name="username" required>
+                                    <option value="">Search by username or name...</option>
+                                    {% for user in all_users %}
+                                        <option value="{{ user.username }}" 
+                                                data-fullname="{{ user.firstname or '' }} {{ user.lastname or '' }}" 
+                                                data-phone="{{ user.mobile or user.phone or '' }}"
+                                                data-connection-type="{{ user.connection_type or '' }}"
+                                                data-dish-ip="{{ user.dish_ip or '' }}">
+                                            {{ user.username }} ({{ user.firstname or '' }} {{ user.lastname or '' }})
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="button" id="btn-sas-search" onclick="lookupUserInSas()" 
+                                    class="hidden h-[46px] px-3 bg-slate-800 border border-slate-700 rounded-lg text-blue-400 hover:bg-slate-700 transition-all shadow-inner"
+                                    title="Search this username directly in SAS API">
+                                <i class="fa-solid fa-magnifying-glass-plus"></i>
+                            </button>
+                        </div>
+                        <p id="search-msg" class="hidden text-[10px] mt-1 text-amber-400 font-medium"></p>
                     </div>
 
                     <input type="hidden" name="fullname" id="fullname_hidden">
@@ -256,7 +271,7 @@
                                 </td>
                                 <td class="px-5 py-4 text-center">
                                      <div class="flex flex-col gap-2">
-                                         {% if session.get('role') in ['admin', 'manager', 'employee'] or (session.get('role') == 'maintenance' and c.status not in ['Resolved', 'Closed']) %}
+                                         {% if session.get('role') in ['admin', 'manager', 'employee'] or (session.get('role') == 'maintenance' and c.status not in ['Resolved', 'Closed'] and c.assigned_to == session.get('username')) %}
                                            <button onclick="event.stopPropagation(); openUpdateModal(this);" 
                                                   data-id="{{ c.id|escape }}"
                                                   data-status="{{ c.status|escape }}"
@@ -422,16 +437,29 @@
         const selectEl = document.getElementById('user-select');
         if (selectEl) {
             const userSelect = new TomSelect("#user-select", {
-                create: false,
+                create: true, // Allow manual typing for SAS lookup
                 dataAttr: 'data',
                 searchField: ['text', 'username'],
-                onItemAdd: function(value) {
-                    const option = this.options[value];
+                onChange: function(value) {
+                    const btnSearch = document.getElementById('btn-sas-search');
+                    const select = document.getElementById('user-select');
+                    const option = select.querySelector(`option[value="${value}"]`);
+                    const searchMsg = document.getElementById('search-msg');
+
+                    if (value && !option) {
+                        btnSearch.classList.remove('hidden');
+                        searchMsg.textContent = "المشترك غير موجود. اضغط 🔍 للبحث في الساس.";
+                        searchMsg.classList.remove('hidden');
+                    } else {
+                        btnSearch.classList.add('hidden');
+                        searchMsg.classList.add('hidden');
+                    }
+
                     if (option) {
-                        const fullname = option.fullname;
-                        const phone = option.phone;
-                        const connType = option["connection-type"];
-                        const dishIp = option["dish-ip"];
+                        const fullname = option.getAttribute('data-fullname');
+                        const phone = option.getAttribute('data-phone');
+                        const connType = option.getAttribute('data-connection-type');
+                        const dishIp = option.getAttribute('data-dish-ip');
                         
                         document.getElementById('fullname_hidden').value = fullname || '';
                         document.getElementById('phone1').value = phone || '';
@@ -446,15 +474,68 @@
                             dishIpEl.value = dishIp || '';
                         }
                     }
-                },
-                render: {
-                    option: function(data, escape) {
-                        return '<div>' +
-                            '<span class="font-bold">' + escape(data.text) + '</span>' +
-                            '</div>';
-                    }
                 }
             });
+
+            window.lookupUserInSas = function() {
+                const username = userSelect.getValue();
+                if (!username) return;
+                
+                const btn = document.getElementById('btn-sas-search');
+                const msg = document.getElementById('search-msg');
+                
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+                msg.textContent = "جاري البحث في سيرفر الساس...";
+                
+                fetch(`/api/user/${username}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'fresh' || data.status === 'cached' || data.status === 'db_cached') {
+                            const u = data.user;
+                            const fullname = (u.firstname || '') + ' ' + (u.lastname || '');
+                            const phone = u.mobile || u.phone || '';
+                            const connType = u.connection_type || '';
+                            const dishIp = u.dish_ip || '';
+                            
+                            // Add to TomSelect
+                            userSelect.addOption({
+                                value: u.username,
+                                text: `${u.username} (${fullname})`,
+                                fullname: fullname,
+                                phone: phone,
+                                "connection-type": connType,
+                                "dish-ip": dishIp
+                            });
+
+                            // Add to real select for metadata
+                            const newOpt = document.createElement('option');
+                            newOpt.value = u.username;
+                            newOpt.setAttribute('data-fullname', fullname);
+                            newOpt.setAttribute('data-phone', phone);
+                            newOpt.setAttribute('data-connection-type', connType);
+                            newOpt.setAttribute('data-dish-ip', dishIp);
+                            selectEl.appendChild(newOpt);
+
+                            userSelect.setValue(u.username);
+                            
+                            btn.classList.add('hidden');
+                            msg.textContent = "تم العثور على المشترك وإضافته بنجاح!";
+                            msg.classList.remove('text-amber-400');
+                            msg.classList.add('text-emerald-400');
+                        } else {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus"></i>';
+                            msg.textContent = "المشترك غير موجود في سيرفر الساس.";
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus"></i>';
+                        msg.textContent = "خطأ في الاتصال بالسيرفر.";
+                    });
+            };
         }
     });
 

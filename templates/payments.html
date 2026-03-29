@@ -163,22 +163,37 @@
 
                 <form method="POST" action="{{ url_for('payments') }}" class="space-y-5">
                     
-                    <div>
-                        <label for="user_select" class="block text-sm font-medium text-slate-400 mb-2">Search User</label>
-                        <select id="user_select" required placeholder="Type username or name...">
-                            <option value="">Search user...</option>
-                            {% for u in all_users %}
-                            <option value="{{ u.username }}" 
-                                data-fullname="{{ (u.firstname or '') ~ ' ' ~ (u.lastname or '') }}"
-                                data-phone="{{ u.mobile or u.phone or u.mobile_number or u.phone_number or '' }}"
-                                data-profile="{% if u.profile_details %}{{ u.profile_details.name }}{% endif %}"
-                                data-parent="{{ u.parent_username or '' }}">
-                                {{ u.username }} {% if u.firstname or u.lastname %}- {{ u.firstname or '' }} {{ u.lastname or '' }}{% endif %}
-                                {% set user_phone = u.mobile or u.phone or u.mobile_number or u.phone_number %}
-                                {% if user_phone %} ({{ user_phone }}){% endif %}
-                            </option>
-                            {% endfor %}
-                        </select>
+                    <div class="relative">
+                        <label for="user_select" class="block text-sm font-medium text-slate-400 mb-2 flex justify-between">
+                            <span>Search User</span>
+                            <button type="button" onclick="location.reload()" class="text-[10px] text-blue-400 hover:underline">
+                                <i class="fa-solid fa-rotate mr-1"></i> Refresh List
+                            </button>
+                        </label>
+                        <div class="flex gap-2">
+                            <div class="flex-grow">
+                                <select id="user_select" required placeholder="Type username or name...">
+                                    <option value="">Search user...</option>
+                                    {% for u in all_users %}
+                                    <option value="{{ u.username }}" 
+                                        data-fullname="{{ (u.firstname or '') ~ ' ' ~ (u.lastname or '') }}"
+                                        data-phone="{{ u.mobile or u.phone or u.mobile_number or u.phone_number or '' }}"
+                                        data-profile="{% if u.profile_details %}{{ u.profile_details.name }}{% endif %}"
+                                        data-parent="{{ u.parent_username or '' }}">
+                                        {{ u.username }} {% if u.firstname or u.lastname %}- {{ u.firstname or '' }} {{ u.lastname or '' }}{% endif %}
+                                        {% set user_phone = u.mobile or u.phone or u.mobile_number or u.phone_number %}
+                                        {% if user_phone %} ({{ user_phone }}){% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="button" id="btn-sas-search" onclick="lookupUserInSas()" 
+                                    class="hidden h-[46px] px-3 bg-slate-800 border border-slate-700 rounded-lg text-blue-400 hover:bg-slate-700 transition-all shadow-inner"
+                                    title="Search this username directly in SAS API">
+                                <i class="fa-solid fa-magnifying-glass-plus"></i>
+                            </button>
+                        </div>
+                        <p id="search-msg" class="hidden text-[10px] mt-1 text-amber-400 font-medium"></p>
                     </div>
 
                     <input type="hidden" name="username" id="hidden_username">
@@ -367,8 +382,7 @@
                     placeholder="Enter password from delete_password.txt">
             </div>
             
-            <div class="flex space-x-3 pt-4">
-                <button type="button" onclick="closeDeleteModal()" class="flex-1 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-medium transition-colors">Cancel</button>
+<button type="button" onclick="closeDeleteModal()" class="flex-1 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-medium transition-colors">Cancel</button>
                 <button type="submit" class="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium transition-colors">Confirm Deletion</button>
             </div>
         </form>
@@ -380,74 +394,121 @@
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        // Init the Searchable dropdown
-        const selectEl = new TomSelect("#user_select",{
-            create: false,
-            sortField: {field: "text", direction: "asc"},
-            placeholder: "Type a username or name to search...",
+    document.addEventListener('DOMContentLoaded', function() {
+        const settings = {
+            create: true, // Allow typing new names for SAS lookup
+            maxItems: 1,
             onChange: function(value) {
-                if (!value) return;
-                const option = this.options[value];
-                const optElement = option.$option || option.node;
-                
-                if(!optElement) return;
-
-                const fullname = (optElement.getAttribute('data-fullname') || "").trim();
-                const phone = (optElement.getAttribute('data-phone') || "").trim();
-                const profile = (optElement.getAttribute('data-profile') || "").trim();
-                const parent = (optElement.getAttribute('data-parent') || "").trim();
-
-                document.getElementById('hidden_username').value = value;
-                document.getElementById('hidden_fullname').value = fullname;
-                document.getElementById('hidden_phone').value = phone;
-                document.getElementById('hidden_profile').value = profile;
-                document.getElementById('hidden_parent').value = parent;
-                
-                const card = document.getElementById('user_details_card');
-                card.innerHTML = `
-                    <div class="flex flex-col space-y-1">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-slate-500 font-bold uppercase">Details</span>
-                            <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">Selected</span>
-                        </div>
-                        <div class="text-white font-bold text-sm">${(fullname || value)}</div>
-                        <div class="flex items-center text-xs text-slate-400">
-                            <i class="fa-solid fa-phone mr-1 text-[10px] text-blue-400"></i> ${phone || 'No Phone'}
-                            <span class="mx-2 opacity-50">|</span>
-                            <i class="fa-solid fa-box mr-1 text-[10px] text-amber-400"></i> ${profile || 'No Profile'}
-                        </div>
-                    </div>
-                `;
-                
-                // Reveal the UI Card
+                const btnSearch = document.getElementById('btn-sas-search');
+                const select = document.getElementById('user_select');
+                const option = select.querySelector(`option[value="${value}"]`);
                 const detailsCard = document.getElementById('user_details_card');
-                detailsCard.classList.remove('hidden');
-                detailsCard.classList.add('animate-in', 'fade-in', 'slide-in-from-top-2', 'duration-300');
-                
-                // Build UI
-                let htmlStr = '<div class="space-y-1">';
-                htmlStr += '<p class="text-sm flex"><span class="text-slate-500 w-20">Username:</span> <span class="text-white font-medium">' + value + '</span></p>';
-                
-                if (fullname && fullname !== 'None') {
-                    htmlStr += '<p class="text-sm flex"><span class="text-slate-500 w-20">Name:</span> <span class="text-slate-300">' + fullname + '</span></p>';
-                }
-                if (profile && profile !== 'None') {
-                    htmlStr += '<p class="text-sm flex"><span class="text-slate-500 w-20">Profile:</span> <span class="bg-indigo-500/10 text-indigo-300 py-0.5 px-2 rounded border border-indigo-500/20 text-[11px]">' + profile + '</span></p>';
-                }
-                if (parent && parent !== 'None') {
-                    htmlStr += '<p class="text-sm flex items-center"><span class="text-slate-500 w-20">Parent:</span> <span class="text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 text-[11px]"><i class="fa-solid fa-user-tie mr-1"></i>' + parent + '</span></p>';
-                }
-                htmlStr += '</div>';
-                
-                detailsCard.innerHTML = htmlStr;
-                
-                // Auto-focus amount
-                setTimeout(() => document.getElementById('amount').focus(), 50);
-            }
-        });
+                const searchMsg = document.getElementById('search-msg');
 
-        // Auto-dismiss alert messages after 3 seconds
+                if (value && !option) {
+                    // This is a manually typed name not in the current list
+                    btnSearch.classList.remove('hidden');
+                    searchMsg.textContent = "User not in list. Click 🔍 to search SAS.";
+                    searchMsg.classList.remove('hidden');
+                    document.getElementById('hidden_username').value = value;
+                    detailsCard.classList.add('hidden');
+                } else {
+                    btnSearch.classList.add('hidden');
+                    searchMsg.classList.add('hidden');
+                }
+
+                if (option) {
+                    const fullname = option.getAttribute('data-fullname');
+                    const phone = option.getAttribute('data-phone');
+                    const profile = option.getAttribute('data-profile');
+                    const parent = option.getAttribute('data-parent');
+
+                    document.getElementById('hidden_username').value = value;
+                    document.getElementById('hidden_fullname').value = fullname;
+                    document.getElementById('hidden_phone').value = phone;
+                    document.getElementById('hidden_profile').value = profile;
+                    document.getElementById('hidden_parent').value = parent;
+
+                    // Update live display card
+                    detailsCard.innerHTML = `
+                        <div class="flex flex-col gap-1 text-xs">
+                            <div class="flex justify-between"><span class="text-slate-500">Name:</span> <span class="text-white font-bold">${fullname || 'Unknown'}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500">Profile:</span> <span class="text-emerald-400">${profile || 'N/A'}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500">Parent:</span> <span class="text-blue-400">${parent || 'None'}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500">Phone:</span> <span class="text-slate-300">${phone || 'N/A'}</span></div>
+                        </div>
+                    `;
+                    detailsCard.classList.remove('hidden');
+                    // Auto-focus amount
+                    setTimeout(() => document.getElementById('amount').focus(), 50);
+                }
+            }
+        };
+        const tom = new TomSelect('#user_select', settings);
+        
+        window.lookupUserInSas = function() {
+            const username = document.getElementById('hidden_username').value;
+            if (!username) return;
+            
+            const btn = document.getElementById('btn-sas-search');
+            const msg = document.getElementById('search-msg');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+            msg.textContent = "Searching SAS API...";
+            
+            fetch(`/api/user/${username}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'fresh' || data.status === 'cached' || data.status === 'db_cached') {
+                        const u = data.user;
+                        const fullname = (u.firstname || '') + ' ' + (u.lastname || '');
+                        const phone = u.mobile || u.phone || '';
+                        const profile = (u.profile_details && u.profile_details.name) ? u.profile_details.name : '';
+                        const parent = u.parent_username || '';
+                        
+                        // Add to TomSelect data structure
+                        tom.addOption({
+                            value: u.username,
+                            text: `${u.username} - ${fullname} (${phone})`,
+                            fullname: fullname,
+                            phone: phone,
+                            profile: profile,
+                            parent: parent
+                        });
+                        
+                        // We also need to add it to the real <select> so onChange can find the data-* attributes
+                        const select = document.getElementById('user_select');
+                        const newOpt = document.createElement('option');
+                        newOpt.value = u.username;
+                        newOpt.setAttribute('data-fullname', fullname);
+                        newOpt.setAttribute('data-phone', phone);
+                        newOpt.setAttribute('data-profile', profile);
+                        newOpt.setAttribute('data-parent', parent);
+                        select.appendChild(newOpt);
+
+                        tom.setValue(u.username);
+                        
+                        btn.classList.add('hidden');
+                        msg.textContent = "Found! User added to list.";
+                        msg.classList.remove('text-amber-400');
+                        msg.classList.add('text-emerald-400');
+
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus"></i>';
+                        msg.textContent = "User not found in SAS server.";
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus"></i>';
+                    msg.textContent = "Error searching SAS.";
+                });
+        };
+
+        // Auto-dismiss alert messages
         setTimeout(() => {
             document.querySelectorAll('.bg-emerald-500\\/10, .bg-red-500\\/10').forEach(alert => {
                 if (alert.querySelector('.fa-check-circle') || alert.querySelector('.fa-circle-exclamation')) {

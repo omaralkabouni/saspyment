@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block title %}تقارير المخزون - Top Net{% endblock %}
+
+{% block content %}
+{% include 'navbar.html' %}
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" dir="rtl">
+    <div class="flex items-center justify-between mb-2">
+        <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+            <i class="fa-solid fa-chart-pie text-purple-400"></i>
+            تقارير المخزون والأرباح
+        </h1>
+        <a href="{{ url_for('inventory') }}" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg text-sm font-bold hover:bg-slate-600 transition-all">
+            <i class="fa-solid fa-arrow-right ml-1"></i> العودة للمخزون
+        </a>
+    </div>
+    <p class="text-slate-400 text-sm mb-8">ملخص شامل لحركة المخزون والأرباح والتكاليف</p>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <div class="glass-panel rounded-xl p-4 text-center border border-slate-700">
+            <div class="text-2xl font-bold text-white">{{ total_items }}</div>
+            <div class="text-xs text-slate-400 mt-1">عدد المنتجات</div>
+        </div>
+        <div class="glass-panel rounded-xl p-4 text-center border border-blue-500/20">
+            <div class="text-xl font-bold text-blue-400">${{ "{:,.2f}".format(total_stock_value) }}</div>
+            <div class="text-xs text-slate-400 mt-1">قيمة المخزون</div>
+        </div>
+        <div class="glass-panel rounded-xl p-4 text-center border border-amber-500/20">
+            <div class="text-xl font-bold text-amber-400">${{ "{:,.2f}".format(total_purchases) }}</div>
+            <div class="text-xs text-slate-400 mt-1">إجمالي المشتريات</div>
+        </div>
+        <div class="glass-panel rounded-xl p-4 text-center border border-emerald-500/20">
+            <div class="text-xl font-bold text-emerald-400">${{ "{:,.2f}".format(total_sales_amount) }}</div>
+            <div class="text-xs text-slate-400 mt-1">إجمالي المبيعات</div>
+        </div>
+        <div class="glass-panel rounded-xl p-4 text-center border {% if total_profit >= 0 %}border-emerald-500/20{% else %}border-red-500/20{% endif %}">
+            <div class="text-xl font-bold {% if total_profit >= 0 %}text-emerald-400{% else %}text-red-400{% endif %}">${{ "{:,.2f}".format(total_profit) }}</div>
+            <div class="text-xs text-slate-400 mt-1">صافي الأرباح</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Monthly Breakdown -->
+        <div class="glass-panel rounded-xl p-6 border border-slate-700">
+            <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-calendar-days text-blue-400"></i> الأرباح الشهرية
+            </h3>
+            {% if monthly_sales %}
+            <div class="overflow-hidden rounded-xl border border-white/10">
+                <table class="w-full text-right">
+                    <thead>
+                        <tr class="bg-slate-800 text-slate-300 text-xs">
+                            <th class="p-3">الشهر</th>
+                            <th class="p-3">الإيرادات</th>
+                            <th class="p-3">التكلفة</th>
+                            <th class="p-3">الربح</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5">
+                        {% for m in monthly_sales %}
+                        <tr class="hover:bg-white/5 transition-colors">
+                            <td class="p-3 text-white font-bold text-sm">{{ m.month }}</td>
+                            <td class="p-3 text-emerald-400 font-mono text-sm">${{ "{:,.2f}".format(m.revenue) }}</td>
+                            <td class="p-3 text-red-400 font-mono text-sm">${{ "{:,.2f}".format(m.cost) }}</td>
+                            <td class="p-3 font-bold font-mono text-sm {% if m.profit >= 0 %}text-emerald-400{% else %}text-red-400{% endif %}">
+                                ${{ "{:,.2f}".format(m.profit) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-slate-500 py-8">لا توجد بيانات مبيعات بعد.</div>
+            {% endif %}
+        </div>
+
+        <!-- Top Products -->
+        <div class="glass-panel rounded-xl p-6 border border-slate-700">
+            <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-ranking-star text-amber-400"></i> تفاصيل المنتجات
+            </h3>
+            <div class="overflow-hidden rounded-xl border border-white/10">
+                <table class="w-full text-right">
+                    <thead>
+                        <tr class="bg-slate-800 text-slate-300 text-xs">
+                            <th class="p-3">المنتج</th>
+                            <th class="p-3">مشتريات</th>
+                            <th class="p-3">مبيعات</th>
+                            <th class="p-3">المخزون</th>
+                            <th class="p-3">الإيراد</th>
+                            <th class="p-3">الربح</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5">
+                        {% for item in items_report %}
+                        <tr class="hover:bg-white/5 transition-colors">
+                            <td class="p-3">
+                                <div class="text-white font-bold text-sm">{{ item.name }}</div>
+                                <div class="text-[10px] text-slate-500">{{ item.category }}</div>
+                            </td>
+                            <td class="p-3 text-sm text-slate-400">{{ item.total_purchased }}</td>
+                            <td class="p-3 text-sm text-blue-400 font-bold">{{ item.total_sold }}</td>
+                            <td class="p-3 text-sm {% if item.stock_qty <= item.min_stock %}text-red-400{% else %}text-white{% endif %} font-bold">
+                                {{ item.stock_qty }}
+                            </td>
+                            <td class="p-3 text-sm text-emerald-400 font-mono">${{ "{:,.2f}".format(item.revenue) }}</td>
+                            <td class="p-3 text-sm font-bold font-mono {% if item.revenue - item.cost_of_sold >= 0 %}text-emerald-400{% else %}text-red-400{% endif %}">
+                                ${{ "{:,.2f}".format(item.revenue - item.cost_of_sold) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not items_report %}
+                        <tr><td colspan="6" class="p-8 text-center text-slate-500">لا توجد منتجات.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

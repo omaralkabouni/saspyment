@@ -33,6 +33,12 @@
                        class="{% if request.path == url_for('installations') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %} px-3 py-2 rounded-lg text-sm font-medium transition-colors">
                         {% if session.get('lang', 'ar') == 'ar' %}تركيبات{% else %}Installations{% endif %}
                     </a>
+                    {% if session.get('role') != 'maintenance' %}
+                    <a href="{{ url_for('inventory') }}" 
+                       class="{% if '/inventory' in request.path %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %} px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                        {% if session.get('lang', 'ar') == 'ar' %}المخزون{% else %}Inventory{% endif %}
+                    </a>
+                    {% endif %}
 
                     <!-- More / Admin Dropdown -->
                     {% if session.get('role') in ['admin', 'manager'] %}
@@ -174,6 +180,11 @@
             <a href="{{ url_for('installations') }}" class="block px-3 py-4 rounded-md text base font-medium {% if request.path == url_for('installations') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
                 <i class="fa-solid fa-screwdriver-wrench w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}تركيبات{% else %}Installations{% endif %}
             </a>
+            {% if session.get('role') != 'maintenance' %}
+            <a href="{{ url_for('inventory') }}" class="block px-3 py-4 rounded-md text base font-medium {% if '/inventory' in request.path %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-warehouse w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}المخزون{% else %}Inventory{% endif %}
+            </a>
+            {% endif %}
             {% if session.get('role') in ['admin', 'manager'] %}
             <a href="{{ url_for('report') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('report') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
                 <i class="fa-solid fa-chart-pie w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}التقرير المالي{% else %}Financial Report{% endif %}
