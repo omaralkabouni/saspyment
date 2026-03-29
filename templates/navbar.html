@@ -63,10 +63,13 @@
                                 <i class="fa-solid fa-box-open w-4 opacity-70"></i> 
                                 {% if session.get('lang', 'ar') == 'ar' %}إدارة باقات الموقع{% else %}Landing Packages{% endif %}
                             </a>
-                            <a href="{{ url_for('backup_db') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
+                            <a href="{{ url_for('settings_database') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
                                 <i class="fa-solid fa-database w-4 opacity-70"></i> 
-                                {% if session.get('lang', 'ar') == 'ar' %}تحميل نسخة احتياطية{% else %}Database Backup{% endif %}
+                                {% if session.get('lang', 'ar') == 'ar' %}إدارة قاعدة البيانات{% else %}Database Management{% endif %}
                             </a>
+                            <form id="restore-form" action="{{ url_for('restore_db') }}" method="POST" enctype="multipart/form-data" class="hidden">
+                                <input type="file" name="backup_file" id="restore-input" onchange="confirmRestore()" accept=".sqlite,.db">
+                            </form>
                             {% endif %}
                         </div>
                     </div>
@@ -260,5 +263,23 @@
 
     if (themeToggleBtn) {
         // removed toggle logic
+    }
+</script>
+
+<script>
+    function triggerRestore() {
+        document.getElementById('restore-input').click();
+    }
+
+    function confirmRestore() {
+        const input = document.getElementById('restore-input');
+        if (input.files.length > 0) {
+            const msg = "{% if session.get('lang', 'ar') == 'ar' %}تحذير: هل أنت متأكد من استعادة قاعدة البيانات؟ سيتم استبدال جميع البيانات الحالية. سيقوم النظام بأخذ نسخة احتياطية تلقائية أولاً.{% else %}WARNING: Are you sure you want to restore the database? All current data will be overwritten. An automatic backup will be created first.{% endif %}";
+            if (confirm(msg)) {
+                document.getElementById('restore-form').submit();
+            } else {
+                input.value = ''; // Reset input
+            }
+        }
     }
 </script>
