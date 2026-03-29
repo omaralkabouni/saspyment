@@ -73,6 +73,69 @@
         .status-completed { background: #a6e3a1; color: #11111b; }
         .status-pending { background: #fab387; color: #11111b; }
         .status-assigned { background: #89b4fa; color: #11111b; }
+
+        /* Print Optimization for 80mm Printers */
+        @media print {
+            body {
+                background: #fff !important;
+                color: #000 !important;
+                display: block;
+                padding: 0;
+                margin: 0;
+                width: 80mm;
+            }
+            .container {
+                background: #fff !important;
+                backdrop-filter: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+                padding: 1mm !important;
+                max-width: none !important;
+                width: 72mm !important;
+                margin: 0 auto !important;
+                box-shadow: none !important;
+            }
+            .header h1, .amount, .label, .value, .footer {
+                color: #000 !important;
+            }
+            .header i { display: none; }
+            .info-card {
+                background: #fff !important;
+                border: 1px dashed #000;
+                border-radius: 0 !important;
+                padding: 10px;
+            }
+            .amount {
+                font-size: 24px !important;
+                border: 2px solid #000;
+                padding: 10px;
+                background: #f0f0f0 !important;
+            }
+            .btn-print, .nav-btn {
+                display: none !important;
+            }
+            @page {
+                size: 80mm auto;
+                margin: 0;
+            }
+        }
+        .btn-print {
+            background: #fab387;
+            color: #11111b;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+        .btn-print:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(250, 179, 135, 0.4); }
     </style>
 </head>
 <body>
@@ -136,6 +199,11 @@
             <div class="value">{{ p.payment_notes }}</div>
         </div>
         {% endif %}
+
+        <button onclick="window.print()" class="btn-print">
+            <i class="fas fa-print"></i>
+            <span>طباعة الطلب (كاشير)</span>
+        </button>
 
         <div class="footer">
             شكراً لاختياركم خدماتنا <br>

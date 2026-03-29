@@ -22,13 +22,13 @@
             padding: 0;
             background: #fff;
             color: #000;
-            width: 80mm;
-            /* Standard Thermal Printer Width */
+            width: 80mm; /* Full paper width */
+            overflow-x: hidden;
         }
 
         .receipt {
-            width: 100%;
-            padding: 3mm;
+            width: 72mm; /* Safe printable area for 80mm printers */
+            padding: 2mm;
             margin: 0 auto;
         }
 
@@ -116,6 +116,13 @@
 
             body {
                 width: 80mm;
+                background: white;
+            }
+
+            .receipt {
+                width: 72mm;
+                margin: 0 auto;
+                padding: 1mm;
             }
 
             @page {
