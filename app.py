@@ -4,6 +4,7 @@ import io
 import math
 import time
 import os
+import shutil
 import random
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response, send_file, send_from_directory, make_response
@@ -68,6 +69,11 @@ WEBHOOK_URL = os.getenv('WEBHOOK_URL', '')
 
 # Database Path
 DB_PATH = os.getenv('DB_PATH', 'payments.db')
+# Ensure BACKUP_DIR is relative to DB_PATH directory for persistence in Docker
+BACKUP_DIR = os.getenv('BACKUP_DIR', os.path.join(os.path.dirname(os.path.abspath(DB_PATH)), 'backups'))
+
+if not os.path.exists(BACKUP_DIR):
+    os.makedirs(BACKUP_DIR)
 
 USER_CACHE: dict[str, Any] = {
     'data': None,
@@ -666,6 +672,145 @@ def backup_db():
         
     filename = f"TopNetPay_DB_Backup_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.sqlite"
     return send_file(db_path, as_attachment=True, download_name=filename)
+
+@app.route('/restore', methods=['POST'])
+def restore_db():
+    if 'token' not in session: return redirect(url_for('login'))
+    if session.get('role') != 'admin':
+        flash('🚫 Access Denied: Admin only.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    if 'backup_file' not in request.files:
+        flash('No file uploaded.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    file = request.files['backup_file']
+    if file.filename == '':
+        flash('No file selected.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    if file:
+        # Create an emergency backup of the current DB
+        if os.path.exists(DB_PATH):
+            shutil.copy(DB_PATH, DB_PATH + ".bak")
+            
+        try:
+            # Save the new file over the old one
+            file.save(DB_PATH)
+            
+            # Simple SQLite validation (header check)
+            with open(DB_PATH, 'rb') as f:
+                header = f.read(16)
+                if header != b'SQLite format 3\x00':
+                    # Restore from backup if invalid
+                    shutil.move(DB_PATH + ".bak", DB_PATH)
+                    flash('Invalid database file format.', 'error')
+                    return redirect(url_for('dashboard'))
+            
+            # Re-initialize DB to sync schema if any new columns were added in the restore
+            init_db()
+            
+            flash('✅ Database restored successfully! A backup of the old database was saved as payments.db.bak.', 'success')
+        except Exception as e:
+            if os.path.exists(DB_PATH + ".bak"):
+                shutil.move(DB_PATH + ".bak", DB_PATH)
+            flash(f'Error during restoration: {e}', 'error')
+            
+    return redirect(url_for('dashboard'))
+
+@app.route('/settings/database')
+def settings_database():
+    if 'token' not in session: return redirect(url_for('login'))
+    if session.get('role') != 'admin':
+        flash('🚫 Access Denied: Admin only.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    backups = []
+    if os.path.exists(BACKUP_DIR):
+        for f in os.listdir(BACKUP_DIR):
+            if f.endswith('.sqlite') or f.endswith('.db'):
+                path = os.path.join(BACKUP_DIR, f)
+                stats = os.stat(path)
+                backups.append({
+                    'name': f,
+                    'size': f"{stats.st_size / (1024*1024):.2f} MB",
+                    'date': datetime.fromtimestamp(stats.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                    'timestamp': stats.st_mtime
+                })
+    
+    # Sort by newest first
+    backups.sort(key=lambda x: x['timestamp'], reverse=True)
+    
+    return render_template('settings_database.html', backups=backups)
+
+@app.route('/settings/database/create', methods=['POST'])
+def create_backup():
+    if 'token' not in session: return redirect(url_for('login'))
+    if session.get('role') != 'admin':
+        flash('🚫 Access Denied.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    try:
+        filename = f"SAS_Backup_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.sqlite"
+        dest = os.path.join(BACKUP_DIR, filename)
+        shutil.copy(DB_PATH, dest)
+        flash(f'✅ Backup created successfully: {filename}', 'success')
+    except Exception as e:
+        flash(f'Error creating backup: {e}', 'error')
+        
+    return redirect(url_for('settings_database'))
+
+@app.route('/settings/database/restore/<filename>', methods=['POST'])
+def restore_from_file(filename):
+    if 'token' not in session: return redirect(url_for('login'))
+    if session.get('role') != 'admin':
+        flash('🚫 Access Denied.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    src = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(src):
+        flash('Backup file not found.', 'error')
+        return redirect(url_for('settings_database'))
+        
+    # Create an emergency backup of the current DB
+    shutil.copy(DB_PATH, DB_PATH + ".bak")
+    
+    try:
+        shutil.copy(src, DB_PATH)
+        # Re-initialize DB to sync schema
+        init_db()
+        flash(f'✅ Database restored successfully from {filename}!', 'success')
+    except Exception as e:
+        if os.path.exists(DB_PATH + ".bak"):
+            shutil.move(DB_PATH + ".bak", DB_PATH)
+        flash(f'Error during restoration: {e}', 'error')
+        
+    return redirect(url_for('settings_database'))
+
+@app.route('/settings/database/download/<filename>')
+def download_backup(filename):
+    if 'token' not in session: return redirect(url_for('login'))
+    if session.get('role') != 'admin':
+        flash('🚫 Access Denied.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    return send_from_directory(BACKUP_DIR, filename, as_attachment=True)
+
+@app.route('/settings/database/delete/<filename>', methods=['POST'])
+def delete_backup_file(filename):
+    if 'token' not in session: return redirect(url_for('login'))
+    if session.get('role') != 'admin':
+        flash('🚫 Access Denied.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    path = os.path.join(BACKUP_DIR, filename)
+    if os.path.exists(path):
+        os.remove(path)
+        flash(f'🗑️ Backup {filename} deleted.', 'success')
+    else:
+        flash('File not found.', 'error')
+        
+    return redirect(url_for('settings_database'))
 
 @app.route('/dashboard')
 def dashboard():
