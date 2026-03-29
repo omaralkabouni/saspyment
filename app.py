@@ -14,6 +14,10 @@ import requests
 import threading
 import uuid
 from typing import Any
+from dotenv import load_dotenv
+
+# Load environment variables from .env file for local development
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'super_secret_sas_dashboard_key_123')
@@ -24,11 +28,29 @@ def sw():
     response = make_response(send_from_directory('static', 'sw.js'))
     response.headers['Content-Type'] = 'application/javascript'
     response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
 
 @app.route('/manifest.json')
 def manifest():
-    return send_from_directory('static', 'manifest.json')
+    response = make_response(send_from_directory('static', 'manifest.json'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
+@app.after_request
+def add_header(response):
+    """
+    Add headers to both force latest IE rendering engine or Chrome Frame,
+    and also to cache the rendered page for 10 minutes.
+    """
+    if 'Cache-Control' not in response.headers:
+        if request.path.startswith('/static/'):
+            # Cache static assets for 1 year
+            response.headers['Cache-Control'] = 'public, max-age=31536000'
+        else:
+            # Do not cache dynamic content
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
 
 # Initialize the SAS API client with the user's server IP
 # SAS Radius Configuration
