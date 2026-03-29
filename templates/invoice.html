@@ -22,12 +22,12 @@
             padding: 0;
             background: #fff;
             color: #000;
-            width: 80mm; /* Full paper width */
+            width: 70mm; /* Full paper width */
             overflow-x: hidden;
         }
 
         .receipt {
-            width: 72mm; /* Safe printable area for 80mm printers */
+            width: 65mm; /* Safe printable area for 70mm printers */
             padding: 2mm;
             margin: 0 auto;
         }
@@ -115,19 +115,19 @@
             }
 
             body {
-                width: 80mm;
+                width: 70mm;
                 background: white;
             }
 
             .receipt {
-                width: 72mm;
+                width: 65mm;
                 margin: 0 auto;
                 padding: 1mm;
             }
 
             @page {
                 margin: 0;
-                size: 80mm auto;
+                size: 70mm auto;
             }
         }
     </style>
@@ -139,7 +139,7 @@
 
         <div class="header">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2mm;">
-                <div id="qrcode"></div>
+                <div id="qrcode" style="padding: 2px; background: white;"></div>
                 <img src="/image/LOGO.png" class="logo" alt="Logo" style="max-height: 22mm; width: auto; margin: 0;">
             </div>
             <p class="company-name" style="font-size: 13px; margin: 0; text-align: center;">Top Net Syria <span style="font-size: 8px; font-weight: normal;">- لخدمات الإنترنت</span></p>
@@ -203,11 +203,11 @@
         var publicUrl = window.location.origin + "/v/{{ p.public_token }}";
         new QRCode(document.getElementById("qrcode"), {
             text: publicUrl,
-            width: 80,
-            height: 80,
+            width: 96,
+            height: 96,
             colorDark : "#000000",
             colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.H
+            correctLevel : QRCode.CorrectLevel.L
         });
     </script>
 </body>
