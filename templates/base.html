@@ -55,7 +55,7 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
-              <div class="mb-3 p-4 rounded-2xl shadow-2xl backdrop-blur-xl border pointer-events-auto animate-in slide-in-from-top-4 duration-300
+              <div class="flash-message mb-3 p-4 rounded-2xl shadow-2xl backdrop-blur-xl border pointer-events-auto animate-in slide-in-from-top-4 duration-300
                           {% if category == 'success' %}bg-emerald-500/10 text-emerald-400 border-emerald-500/20{% else %}bg-red-500/10 text-red-500 border-red-500/20{% endif %}">
                 <div class="flex items-center gap-3">
                     {% if category == 'success' %}
@@ -78,6 +78,19 @@
 
     <!-- PWA Service Worker Registration -->
     <script>
+      // Auto-hide flash messages after 2 seconds
+      document.addEventListener('DOMContentLoaded', () => {
+        const flashes = document.querySelectorAll('.flash-message');
+        flashes.forEach(flash => {
+          setTimeout(() => {
+            flash.style.opacity = '0';
+            flash.style.transform = 'translateY(-20px)';
+            flash.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            setTimeout(() => flash.remove(), 500);
+          }, 2000);
+        });
+      });
+
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').then((registration) => {
