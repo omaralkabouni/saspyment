@@ -15,4 +15,8 @@ services:
       - SECRET_KEY=change_this_to_something_secure
       - DB_PATH=/app/data/payments.db
       - SAS_API_IP=193.43.140.218
+      - SAS_ADMIN_USER=Top
+      - SAS_ADMIN_PASS=omar@123
+      - SPECIAL_LOGIN_USER=maram
+      - SPECIAL_LOGIN_PASS=m@123
       - WEBHOOK_URL=https://your-n8n-webhook-url.com

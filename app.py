@@ -31,7 +31,13 @@ def manifest():
     return send_from_directory('static', 'manifest.json')
 
 # Initialize the SAS API client with the user's server IP
+# SAS Radius Configuration
 SAS_API_IP = os.getenv('SAS_API_IP', '193.43.140.218')
+SAS_ADMIN_USER = os.getenv('SAS_ADMIN_USER', 'Top')
+SAS_ADMIN_PASS = os.getenv('SAS_ADMIN_PASS', 'omar@123')
+SPECIAL_LOGIN_USER = os.getenv('SPECIAL_LOGIN_USER', 'maram')
+SPECIAL_LOGIN_PASS = os.getenv('SPECIAL_LOGIN_PASS', 'm@123')
+
 sasclient = SasAPI(f"https://{SAS_API_IP}", portal='admin')
 subscriber_client = SasAPI(f"https://{SAS_API_IP}", portal='user')
 
@@ -77,6 +83,30 @@ def init_db():
             phone TEXT, 
             public_token TEXT UNIQUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS installations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fullname TEXT NOT NULL,
+            phone1 TEXT NOT NULL,
+            phone2 TEXT,
+            area TEXT,
+            address_details TEXT,
+            notes TEXT,
+            status TEXT DEFAULT 'Pending',
+            assigned_to TEXT,
+            registered_by TEXT,
+            payment_amount REAL,
+            payment_notes TEXT,
+            connection_type TEXT,
+            dish_ip TEXT,
+            payment_amount_usd REAL DEFAULT 0,
+            payment_amount_syp REAL DEFAULT 0,
+            public_token TEXT UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
@@ -277,29 +307,6 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS installations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fullname TEXT NOT NULL,
-            phone1 TEXT NOT NULL,
-            phone2 TEXT,
-            area TEXT,
-            address_details TEXT,
-            notes TEXT,
-            status TEXT DEFAULT 'Pending',
-            assigned_to TEXT,
-            registered_by TEXT,
-            payment_amount REAL,
-            payment_notes TEXT,
-            connection_type TEXT,
-            dish_ip TEXT,
-            payment_amount_usd REAL DEFAULT 0,
-            payment_amount_syp REAL DEFAULT 0,
-            public_token TEXT UNIQUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
 
     # Add a default admin user if not exists
     c.execute('SELECT count(*) FROM users WHERE username = "admin"')
@@ -620,9 +627,9 @@ def login():
         auth_username = username
         auth_password = password
         
-        if username == 'maram' and password == 'm@123':
-            auth_username = 'Top'
-            auth_password = 'omar@123'
+        if username == SPECIAL_LOGIN_USER and password == SPECIAL_LOGIN_PASS:
+            auth_username = SAS_ADMIN_USER
+            auth_password = SAS_ADMIN_PASS
 
         # 1. Check local database for users
         conn = get_db_connection()
@@ -631,7 +638,7 @@ def login():
         
         if local_user:
             # For local users, we use the background SAS account to get a valid token
-            token, error_msg = sasclient.login(username='Top', password='omar@123')
+            token, error_msg = sasclient.login(username=SAS_ADMIN_USER, password=SAS_ADMIN_PASS)
             if token:
                 session['token'] = token
                 session['username'] = username
