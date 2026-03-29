@@ -10,7 +10,33 @@
     <meta name="theme-color" content="#1e293b">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
     
-    <!-- Tailwind CSS -->
+    <!-- Preconnect to external services to speed up loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
+
+    <!-- Anti-flicker style to prevent flashing of unstyled content (FOUC) -->
+    <style>
+        /* Hide body until fonts and styles are loaded */
+        [v-cloak] { display: none; }
+        .no-fouc { opacity: 0; }
+        .fouc-ready { opacity: 1; transition: opacity 0.3s ease-in-out; }
+    </style>
+    <script>
+        document.documentElement.className += ' no-fouc';
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-fouc');
+            document.documentElement.classList.add('fouc-ready');
+        });
+        // Fallback to show items if load event takes too long
+        setTimeout(() => {
+            document.documentElement.classList.remove('no-fouc');
+            document.documentElement.classList.add('fouc-ready');
+        }, 800);
+    </script>
+    
+    <!-- Tailwind CSS (Keep CDN for JIT, but optimize structure) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -25,10 +51,12 @@
             }
         }
     </script>
-    <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Local FontAwesome (Already downloaded to static/css) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/all.min.css') }}">
+    
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     {% block extra_head %}{% endblock %}
 
