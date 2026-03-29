@@ -71,6 +71,8 @@ get_or_create_delete_password()
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+
+    # 1. Create ALL tables if they don't exist
     c.execute('''
         CREATE TABLE IF NOT EXISTS payments_v3 (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,7 +87,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
+
     c.execute('''
         CREATE TABLE IF NOT EXISTS installations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -110,74 +112,13 @@ def init_db():
         )
     ''')
     
-    # Migration: Add phone column if it doesn't exist
-    try:
-        c.execute("ALTER TABLE payments_v3 ADD COLUMN phone TEXT")
-    except sqlite3.OperationalError:
-        pass # Already exists
-
-    # Migration: Add public_token column if it doesn't exist
-    try:
-        c.execute("ALTER TABLE payments_v3 ADD COLUMN public_token TEXT")
-    except sqlite3.OperationalError:
-        pass # Already exists
-
-    # Migration: Add unique index for public_token
-    try:
-        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_token ON payments_v3(public_token)")
-    except sqlite3.OperationalError:
-        pass
-
-    # Migration: Add public_token to installations if it doesn't exist
-    try:
-        c.execute("ALTER TABLE installations ADD COLUMN public_token TEXT")
-    except sqlite3.OperationalError:
-        pass 
-
-    # Migration: Populate missing public_tokens for payments
-    rows = c.execute("SELECT id FROM payments_v3 WHERE public_token IS NULL").fetchall()
-    for row in rows:
-        token = str(uuid.uuid4())
-        c.execute("UPDATE payments_v3 SET public_token = ? WHERE id = ?", (token, row[0]))
-
-    # Migration: Populate missing public_tokens for installations
-    rows = c.execute("SELECT id FROM installations WHERE public_token IS NULL").fetchall()
-    for row in rows:
-        token = str(uuid.uuid4())
-        c.execute("UPDATE installations SET public_token = ? WHERE id = ?", (token, row[0]))
-    
-    conn.commit()
-
     c.execute('''
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT
         )
     ''')
-    
-    # Seed default webhooks from ENV if not set
-    default_webhook = os.getenv('WEBHOOK_URL', '')
-    for key in ['webhook_payments', 'webhook_complaints', 'webhook_installations']:
-        c.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, default_webhook))
-    
-    # Seed toggles
-    toggles = [
-        ('webhook_payments_enabled', '1'),
-        ('webhook_complaints_enabled', '1'),
-        ('webhook_installations_enabled', '1'),
-        ('webhook_complaints_on_new', '1'),
-        ('webhook_complaints_on_assign', '1'),
-        ('webhook_complaints_on_update', '1'),
-        ('webhook_complaints_on_resolve', '1'),
-        ('webhook_installations_on_new', '1'),
-        ('webhook_installations_on_assign', '1'),
-        ('webhook_installations_on_update', '1'),
-        ('webhook_installations_on_complete', '1')
-    ]
-    for key, val in toggles:
-        c.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, val))
-    
-    # New Table for Local Subscriber Login
+
     c.execute('''
         CREATE TABLE IF NOT EXISTS subscribers (
             username TEXT PRIMARY KEY,
@@ -193,29 +134,18 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
+
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
             password TEXT NOT NULL,
             role TEXT DEFAULT 'admin',
-            maintenance_id TEXT
+            maintenance_id TEXT,
+            phone TEXT,
+            parent TEXT
         )
     ''')
-
-    # Migrations for users table
-    for col_name in ['phone', 'maintenance_id']:
-        try:
-            c.execute(f"ALTER TABLE users ADD COLUMN {col_name} TEXT")
-        except sqlite3.OperationalError:
-            pass # Already exists
-
-    # Migration for complaints table
-    try:
-        c.execute("ALTER TABLE complaints ADD COLUMN assigned_to TEXT")
-    except sqlite3.OperationalError:
-        pass # Already exists
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS complaints (
@@ -230,7 +160,11 @@ def init_db():
             status TEXT DEFAULT 'Open',
             maintenance_notes TEXT,
             maintenance_user_id TEXT,
+            assigned_to TEXT,
             registered_by TEXT,
+            connection_type TEXT,
+            dish_ip TEXT,
+            parent TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -249,35 +183,6 @@ def init_db():
         )
     ''')
 
-    # Migration: Add registered_by column if it doesn't exist
-    try:
-        c.execute("ALTER TABLE complaints ADD COLUMN registered_by TEXT")
-    except sqlite3.OperationalError:
-        pass # Already exists
-        
-    # Migration: Add connection_type column to complaints
-    try:
-        c.execute("ALTER TABLE complaints ADD COLUMN connection_type TEXT")
-    except sqlite3.OperationalError:
-        pass # Already exists
-        
-    # Migration: Add dish_ip column to complaints
-    try:
-        c.execute("ALTER TABLE complaints ADD COLUMN dish_ip TEXT")
-    except sqlite3.OperationalError:
-        pass # Already exists
-        
-    # Migration: Add parent column to user schemas
-    try:
-        c.execute("ALTER TABLE users ADD COLUMN parent TEXT")
-    except sqlite3.OperationalError: pass
-    try:
-        c.execute("ALTER TABLE complaints ADD COLUMN parent TEXT")
-    except sqlite3.OperationalError: pass
-    try:
-        c.execute("ALTER TABLE installations ADD COLUMN parent TEXT")
-    except sqlite3.OperationalError: pass
-        
     c.execute('''
         CREATE TABLE IF NOT EXISTS subscriber_info (
             username TEXT PRIMARY KEY,
@@ -286,32 +191,6 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
-    # Migration: Add connection_type and dish_ip to installations
-    try:
-        c.execute("ALTER TABLE installations ADD COLUMN connection_type TEXT")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        c.execute("ALTER TABLE installations ADD COLUMN dish_ip TEXT")
-    except sqlite3.OperationalError:
-        pass
-    
-    # Migration: Add USD and SYP payment columns
-    try:
-        c.execute("ALTER TABLE installations ADD COLUMN payment_amount_usd REAL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        c.execute("ALTER TABLE installations ADD COLUMN payment_amount_syp REAL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-
-
-    # Add a default admin user if not exists
-    c.execute('SELECT count(*) FROM users WHERE username = "admin"')
-    if c.fetchone()[0] == 0:
-        c.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', ('admin', 'admin@123', 'admin'))
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS sas_cache (
@@ -333,6 +212,88 @@ def init_db():
             is_active INTEGER DEFAULT 1
         )
     ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            amount REAL NOT NULL,
+            description TEXT,
+            admin_name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 2. Run Migrations (Adding columns if they don't exist)
+    migrations = [
+        ("payments_v3", "phone", "TEXT"),
+        ("payments_v3", "public_token", "TEXT"),
+        ("users", "phone", "TEXT"),
+        ("users", "maintenance_id", "TEXT"),
+        ("users", "parent", "TEXT"),
+        ("complaints", "assigned_to", "TEXT"),
+        ("complaints", "registered_by", "TEXT"),
+        ("complaints", "connection_type", "TEXT"),
+        ("complaints", "dish_ip", "TEXT"),
+        ("complaints", "parent", "TEXT"),
+        ("installations", "connection_type", "TEXT"),
+        ("installations", "dish_ip", "TEXT"),
+        ("installations", "public_token", "TEXT"),
+        ("installations", "parent", "TEXT"),
+        ("installations", "payment_amount_usd", "REAL DEFAULT 0"),
+        ("installations", "payment_amount_syp", "REAL DEFAULT 0")
+    ]
+
+    for table, column, col_type in migrations:
+        try:
+            c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+        except sqlite3.OperationalError:
+            pass # Already exists
+
+    # Special migration: Index for token
+    try:
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_token ON payments_v3(public_token)")
+    except sqlite3.OperationalError:
+        pass
+
+    # 3. Seed/Sync missing data
+    # Populate missing public_tokens for payments
+    rows = c.execute("SELECT id FROM payments_v3 WHERE public_token IS NULL").fetchall()
+    for row in rows:
+        token = str(uuid.uuid4())
+        c.execute("UPDATE payments_v3 SET public_token = ? WHERE id = ?", (token, row[0]))
+
+    # Populate missing public_tokens for installations
+    rows = c.execute("SELECT id FROM installations WHERE public_token IS NULL").fetchall()
+    for row in rows:
+        token = str(uuid.uuid4())
+        c.execute("UPDATE installations SET public_token = ? WHERE id = ?", (token, row[0]))
+
+    # Seed default webhooks/settings from ENV if not set
+    default_webhook = os.getenv('WEBHOOK_URL', '')
+    for key in ['webhook_payments', 'webhook_complaints', 'webhook_installations']:
+        c.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, default_webhook))
+    
+    toggles = [
+        ('webhook_payments_enabled', '1'),
+        ('webhook_complaints_enabled', '1'),
+        ('webhook_installations_enabled', '1'),
+        ('webhook_complaints_on_new', '1'),
+        ('webhook_complaints_on_assign', '1'),
+        ('webhook_complaints_on_update', '1'),
+        ('webhook_complaints_on_resolve', '1'),
+        ('webhook_installations_on_new', '1'),
+        ('webhook_installations_on_assign', '1'),
+        ('webhook_installations_on_update', '1'),
+        ('webhook_installations_on_complete', '1')
+    ]
+    for key, val in toggles:
+        c.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, val))
+
+    # Default admin user if not exists
+    c.execute('SELECT count(*) FROM users WHERE username = "admin"')
+    if c.fetchone()[0] == 0:
+        c.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', ('admin', 'admin@123', 'admin'))
 
     conn.commit()
     conn.close()
