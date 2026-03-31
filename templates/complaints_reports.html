@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}تقارير الشكاوي - SAS Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-8 animate-fade-in" dir="rtl">
+    <!-- Header & Filters -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/50 backdrop-blur-xl p-6 rounded-3xl border border-white/10">
+        <div>
+            <h1 class="text-3xl font-black text-white bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
+                <i class="fa-solid fa-chart-line ml-2"></i> تقارير الشكاوي
+            </h1>
+            <p class="text-slate-400 mt-1">تحليل أداء عمليات الصيانة والموظفين</p>
+        </div>
+        
+        <form method="GET" class="flex flex-wrap gap-3 items-end">
+            <div class="space-y-1">
+                <label class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mr-2">من تاريخ</label>
+                <input type="date" name="start_date" value="{{ start_date }}" 
+                    class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all">
+            </div>
+            <div class="space-y-1">
+                <label class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mr-2">إلى تاريخ</label>
+                <input type="date" name="end_date" value="{{ end_date }}" 
+                    class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all">
+            </div>
+            <button type="submit" class="bg-blue-600 hover:bg-blue-50 hover:scale-105 hover:text-blue-600 text-white font-bold px-6 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-900/20 active:scale-95">
+                <i class="fa-solid fa-filter ml-1"></i> فلترة
+            </button>
+            <a href="/complaints/reports" class="bg-slate-700 hover:bg-slate-600 text-white font-bold px-4 py-2.5 rounded-xl transition-all active:scale-95">
+                <i class="fa-solid fa-rotate-left"></i>
+            </a>
+        </form>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Total -->
+        <div class="bg-slate-900/40 backdrop-blur-md p-6 rounded-3xl border border-white/5 hover:border-blue-500/30 transition-all group">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">إجمالي الشكاوي</p>
+                    <h3 class="text-4xl font-black text-white group-hover:text-blue-400 transition-colors">{{ total }}</h3>
+                </div>
+                <div class="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500 shadow-inner group-hover:rotate-12 transition-transform">
+                    <i class="fa-solid fa-list-check text-xl"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Resolved -->
+        <div class="bg-slate-900/40 backdrop-blur-md p-6 rounded-3xl border border-white/5 hover:border-emerald-500/30 transition-all group">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">تم الإصلاح</p>
+                    <h3 class="text-4xl font-black text-emerald-400">{{ resolved }}</h3>
+                </div>
+                <div class="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500 shadow-inner group-hover:scale-110 transition-transform">
+                    <i class="fa-solid fa-check-double text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div class="bg-emerald-500 h-full transition-all duration-1000" style="width: {{ (resolved/total*100)|round if total > 0 else 0 }}%"></div>
+            </div>
+        </div>
+        <!-- In Progress -->
+        <div class="bg-slate-900/40 backdrop-blur-md p-6 rounded-3xl border border-white/5 hover:border-amber-500/30 transition-all group">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">قيد العمل</p>
+                    <h3 class="text-4xl font-black text-amber-500">{{ progress }}</h3>
+                </div>
+                <div class="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500 shadow-inner animate-pulse">
+                    <i class="fa-solid fa-screwdriver-wrench text-xl"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Open -->
+        <div class="bg-slate-900/40 backdrop-blur-md p-6 rounded-3xl border border-white/5 hover:border-rose-500/30 transition-all group">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">جديدة / مفتوحة</p>
+                    <h3 class="text-4xl font-black text-rose-500">{{ open }}</h3>
+                </div>
+                <div class="w-12 h-12 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500 shadow-inner group-hover:shake transition-transform">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Volume Trend -->
+        <div class="bg-slate-900/50 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl">
+            <h3 class="text-xl font-black text-white mb-6 flex items-center gap-2">
+                <span class="w-2 h-8 bg-blue-600 rounded-full"></span>
+                حجم الشكاوي (آخر 30 يوم)
+            </h3>
+            <canvas id="timelineChart" height="250"></canvas>
+        </div>
+        
+        <!-- Status & Distribution -->
+        <div class="bg-slate-900/50 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl">
+            <h3 class="text-xl font-black text-white mb-6 flex items-center gap-2">
+                <span class="w-2 h-8 bg-emerald-600 rounded-full"></span>
+                توزيع الحالة وأداء الموظفين
+            </h3>
+            <canvas id="staffChart" height="250"></canvas>
+        </div>
+    </div>
+
+    <!-- Staff Performance Table -->
+    <div class="bg-slate-900/50 backdrop-blur-xl rounded-3xl border border-white/10 overflow-hidden shadow-2xl">
+        <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+            <h3 class="text-xl font-black text-white flex items-center gap-2">
+                <i class="fa-solid fa-users text-blue-400"></i> تفاصيل أداء الموظفين
+            </h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-right border-collapse">
+                <thead>
+                    <tr class="bg-white/5 text-slate-400 text-[10px] uppercase font-bold tracking-widest border-b border-white/5">
+                        <th class="p-5">الموظف</th>
+                        <th class="p-5">المعرف</th>
+                        <th class="p-5">المخصصة له</th>
+                        <th class="p-5">التي تم حلها</th>
+                        <th class="p-5">إجمالي العمليات</th>
+                        <th class="p-5">نسبة الإنجاز</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    {% for staff in staff_stats %}
+                    <tr class="hover:bg-white/10 transition-all group">
+                        <td class="p-5">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-xs shadow-lg shadow-blue-900/40 group-hover:scale-110 transition-transform">
+                                    {{ staff.username[0]|upper }}
+                                </div>
+                                <span class="font-bold text-white">{{ staff.username }}</span>
+                            </div>
+                        </td>
+                        <td class="p-5 text-slate-400 font-mono text-sm">{{ staff.maintenance_id or '---' }}</td>
+                        <td class="p-5 font-bold text-white">{{ staff.total_assigned }}</td>
+                        <td class="p-5">
+                            <span class="py-1 px-3 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">
+                                <i class="fa-solid fa-check mr-1"></i> {{ staff.total_resolved }}
+                            </span>
+                        </td>
+                        <td class="p-5 text-blue-400 font-bold">{{ staff.total_actions }}</td>
+                        <td class="p-5">
+                            {% set rate = (staff.total_resolved / staff.total_assigned * 100)|round(1) if staff.total_assigned > 0 else 0 %}
+                            <div class="flex items-center gap-3">
+                                <div class="flex-1 w-24 bg-slate-800 h-2 rounded-full overflow-hidden">
+                                    <div class="bg-gradient-to-r from-blue-500 to-emerald-500 h-full rounded-full" style="width: {{ rate }}%"></div>
+                                </div>
+                                <span class="text-xs font-mono text-slate-300">{{ rate }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctxTimeline = document.getElementById('timelineChart').getContext('2d');
+    const ctxStaff = document.getElementById('staffChart').getContext('2d');
+
+    // Gradient for Timeline
+    const blueGradient = ctxTimeline.createLinearGradient(0, 0, 0, 400);
+    blueGradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)');
+    blueGradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+    // Timeline Chart
+    new Chart(ctxTimeline, {
+        type: 'line',
+        data: {
+            labels: [{% for t in timeline %}'{{ t.day }}',{% endfor %}],
+            datasets: [{
+                label: 'عدد الشكاوي',
+                data: [{% for t in timeline %}{{ t.count }},{% endfor %}],
+                borderColor: '#3b82f6',
+                backgroundColor: blueGradient,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#3b82f6',
+                pointBorderColor: '#fff',
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+            }
+        }
+    });
+
+    // Staff Performance Chart
+    new Chart(ctxStaff, {
+        type: 'bar',
+        data: {
+            labels: [{% for s in staff_stats %}'{{ s.username }}',{% endfor %}],
+            datasets: [
+                {
+                    label: 'إجمالي المهام المخصصة',
+                    data: [{% for s in staff_stats %}{{ s.total_assigned }},{% endfor %}],
+                    backgroundColor: 'rgba(148, 163, 184, 0.2)',
+                    borderRadius: 8
+                },
+                {
+                    label: 'التي تم حلها',
+                    data: [{% for s in staff_stats %}{{ s.total_resolved }},{% endfor %}],
+                    backgroundColor: '#10b981',
+                    borderRadius: 8
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            indexAxis: 'y',
+            plugins: { legend: { position: 'bottom', labels: { color: '#fff', font: { family: 'inherit' } } } },
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                y: { grid: { display: false }, ticks: { color: '#fff' } }
+            }
+        }
+    });
+});
+</script>
+
+<style>
+@keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+    animation: fade-in 0.6s ease-out forwards;
+}
+::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.5;
+    cursor: pointer;
+}
+</style>
+{% endblock %}

@@ -657,6 +657,10 @@ def send_webhook(data, webhook_url_override=None, webhook_type='payments', event
             }
         elif webhook_type == 'installations':
             event = event_name or "new"
+            public_token = data.get('public_token', '')
+            public_url = f"{base_url}vi/{public_token}" if (base_url and public_token) else ""
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={public_url}" if public_url else ""
+
             if event == 'complete':
                 msg = f"✅ تم استكمال طلب تركيب للمشترك {data.get('fullname', '')} وإتمامه بنجاح."
             elif event == 'assign':
@@ -665,12 +669,6 @@ def send_webhook(data, webhook_url_override=None, webhook_type='payments', event
                 msg = f"🔄 تحديث في طلب التركيب: تم تحديث طلب المشترك {data.get('fullname', '')}."
             else:
                 msg = f"⚠️ طلب تركيب جديد: باسم {data.get('fullname', '')}. للتحقق والمتابعة."
-                
-                qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={public_url}" if public_url else ""
-
-            public_token = data.get('public_token', '')
-            public_url = f"{base_url}vi/{public_token}" if (base_url and public_token) else ""
-            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={public_url}" if public_url else ""
                 
             payload = {
                 "id": data.get('id', 'test_id'),
@@ -1623,6 +1621,43 @@ def inventory():
             else:
                 flash('❌ يرجى اختيار المنتج والكمية.', 'error')
 
+        elif action == 'edit_purchase' and user_role in ['admin', 'manager']:
+            purchase_id = request.form.get('purchase_id')
+            item_id = int(request.form.get('item_id', 0))
+            quantity = int(request.form.get('quantity', 0) or 0)
+            cost_price = float(request.form.get('cost_price', 0) or 0)
+            supplier = request.form.get('supplier', '').strip()
+            notes = request.form.get('notes', '').strip()
+            total_cost = quantity * cost_price
+
+            old_p = conn.execute('SELECT item_id, quantity FROM inventory_purchases WHERE id = ?', (purchase_id,)).fetchone()
+            if old_p and item_id and quantity > 0:
+                # Update stock
+                if old_p['item_id'] == item_id:
+                    diff = quantity - old_p['quantity']
+                    conn.execute('UPDATE inventory_items SET stock_qty = stock_qty + ? WHERE id = ?', (diff, item_id))
+                else:
+                    # Item changed
+                    conn.execute('UPDATE inventory_items SET stock_qty = stock_qty - ? WHERE id = ?', (old_p['quantity'], old_p['item_id']))
+                    conn.execute('UPDATE inventory_items SET stock_qty = stock_qty + ? WHERE id = ?', (quantity, item_id))
+                
+                conn.execute('''
+                    UPDATE inventory_purchases 
+                    SET item_id=?, quantity=?, cost_price=?, total_cost=?, supplier=?, notes=?
+                    WHERE id=?
+                ''', (item_id, quantity, cost_price, total_cost, supplier, notes, purchase_id))
+                conn.commit()
+                flash('✅ تم تحديث بيانات الشراء وتعديل المخزون.', 'success')
+
+        elif action == 'delete_purchase' and user_role in ['admin', 'manager']:
+            purchase_id = request.form.get('purchase_id')
+            p = conn.execute('SELECT item_id, quantity FROM inventory_purchases WHERE id = ?', (purchase_id,)).fetchone()
+            if p:
+                conn.execute('UPDATE inventory_items SET stock_qty = stock_qty - ? WHERE id = ?', (p['quantity'], p['item_id']))
+                conn.execute('DELETE FROM inventory_purchases WHERE id = ?', (purchase_id,))
+                conn.commit()
+                flash('🗑️ تم حذف سجل الشراء وتعديل المخزون.', 'success')
+
         elif action == 'add_sale':
             item_id = int(request.form.get('item_id', 0))
             quantity = int(request.form.get('quantity', 0) or 0)
@@ -2428,6 +2463,69 @@ def export_complaints():
         headers={"Content-Disposition": f"attachment;filename={filename}"}
     )
 
+@app.route('/complaints/reports')
+def complaints_reports():
+    if 'token' not in session: return redirect(url_for('login'))
+    if session.get('role') not in ['admin', 'manager']:
+        flash('🚫 غير مصرح لك بدخول هذه الصفحة.', 'error')
+        return redirect(url_for('complaints'))
+        
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    
+    conn = get_db_connection()
+    
+    where_clause = ""
+    params = []
+    if start_date:
+        where_clause += " AND DATE(created_at) >= ?"
+        params.append(start_date)
+    if end_date:
+        where_clause += " AND DATE(created_at) <= ?"
+        params.append(end_date)
+        
+    # Global Stats
+    total = conn.execute(f"SELECT COUNT(*) FROM complaints WHERE 1=1 {where_clause}", params).fetchone()[0]
+    open_c = conn.execute(f"SELECT COUNT(*) FROM complaints WHERE status = 'Open' {where_clause}", params).fetchone()[0]
+    progress_c = conn.execute(f"SELECT COUNT(*) FROM complaints WHERE status = 'In Progress' {where_clause}", params).fetchone()[0]
+    resolved_c = conn.execute(f"SELECT COUNT(*) FROM complaints WHERE status IN ('Resolved', 'Closed') {where_clause}", params).fetchone()[0]
+    
+    # Per-Staff Stats
+    # We use complaint_logs to find who actually resolved the complaints
+    staff_stats = conn.execute(f'''
+        SELECT 
+            u.username,
+            u.maintenance_id,
+            (SELECT COUNT(*) FROM complaints c WHERE c.assigned_to = u.username {where_clause}) as total_assigned,
+            (SELECT COUNT(DISTINCT l.complaint_id) FROM complaint_logs l 
+             WHERE l.action_by = u.username AND l.new_status IN ('Resolved', 'Closed')
+             {"AND DATE(l.created_at) >= ?" if start_date else ""}
+             {"AND DATE(l.created_at) <= ?" if end_date else ""}
+            ) as total_resolved,
+            (SELECT COUNT(*) FROM complaint_logs l 
+             WHERE l.action_by = u.username
+             {"AND DATE(l.created_at) >= ?" if start_date else ""}
+             {"AND DATE(l.created_at) <= ?" if end_date else ""}
+            ) as total_actions
+        FROM users u
+        WHERE u.role = 'maintenance'
+    ''', [p for p in params for _ in range(3)] if params else []).fetchall()
+    
+    # Data for Timeline Chart
+    timeline = conn.execute(f'''
+        SELECT DATE(created_at) as day, COUNT(*) as count
+        FROM complaints
+        WHERE 1=1 {where_clause}
+        GROUP BY day ORDER BY day ASC LIMIT 30
+    ''', params).fetchall()
+    
+    conn.close()
+    
+    return render_template('complaints_reports.html', 
+        total=total, open=open_c, progress=progress_c, resolved=resolved_c,
+        staff_stats=staff_stats, timeline=timeline,
+        start_date=start_date, end_date=end_date)
+
 @app.route('/profile/password', methods=['GET', 'POST'])
 def change_password():
     if 'token' not in session: return redirect(url_for('login'))
@@ -2479,15 +2577,17 @@ def installations():
             user_parent = session.get('parent', '')
             if fullname and phone1:
                 public_token = str(uuid.uuid4())
-                conn.execute('''
+                cursor = conn.cursor()
+                cursor.execute('''
                     INSERT INTO installations (fullname, phone1, phone2, area, address_details, notes, registered_by, parent, public_token)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (fullname, phone1, phone2, area, address, notes, user_name, user_parent, public_token))
+                new_id = cursor.lastrowid
                 conn.commit()
                 
                 # Send Webhook Notification for Installation Request
                 send_webhook_async({
-                    'id': conn.execute('SELECT last_insert_rowid()').fetchone()[0],
+                    'id': new_id,
                     'type': 'installation_new',
                     'fullname': fullname,
                     'phone': phone1,
