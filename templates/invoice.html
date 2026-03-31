@@ -161,6 +161,12 @@
                 <span>{{ p.fullname }}</span>
             </div>
             {% endif %}
+            <div class="info-row">
+                <span><b>وسيلة الدفع:</b> {{ 'كاش' if p.payment_method == 'Cash' else 'شام كاش' }}</span>
+                {% if p.payment_method == 'ShamCash' and p.receipt_number %}
+                <span><b>رقم الإيصال:</b> {{ p.receipt_number }}</span>
+                {% endif %}
+            </div>
         </div>
 
         <table class="items-table" style="margin: 1mm 0;">

@@ -278,6 +278,17 @@
                         <div class="h-2 bg-slate-700 rounded-full overflow-hidden shadow-inner">
                             <div class="h-full bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)]" style="width: {{ sub_percent }}%"></div>
                         </div>
+                        <!-- Method Breakdown for Subs -->
+                        <div class="mt-3 flex justify-between gap-4">
+                            <div class="flex flex-col">
+                                <span class="text-[9px] text-slate-500 font-bold uppercase">Cash (كاش)</span>
+                                <span class="text-[11px] font-bold text-emerald-400">{{ "{:,.0f}".format(income_method_breakdown.get('Cash', 0)) }}</span>
+                            </div>
+                            <div class="flex flex-col items-end">
+                                <span class="text-[9px] text-slate-500 font-bold uppercase">ShamCash (شام كاش)</span>
+                                <span class="text-[11px] font-bold text-blue-400">{{ "{:,.0f}".format(income_method_breakdown.get('ShamCash', 0)) }}</span>
+                            </div>
+                        </div>
                     </div>
                     <!-- Installs -->
                     <div>

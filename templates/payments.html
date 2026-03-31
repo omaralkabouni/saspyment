@@ -116,16 +116,30 @@
             <div class="flex flex-wrap gap-4">
                 {% for stat in daily_stats %}
                 <div class="bg-slate-800/80 border border-slate-700 px-4 py-3 rounded-lg shadow-inner flex flex-col items-start min-w-[200px] flex-1">
-                    <span class="text-xs text-slate-400 uppercase tracking-widest font-bold mb-1">
-                        {% if stat.parent and stat.parent != 'None' and stat.parent.strip() != '' %}
-                            <i class="fa-solid fa-user-tie mr-1"></i> {{ stat.parent }}
+                    <span class="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">
+                        {% if stat and stat != 'None' and stat.strip() != '' %}
+                            <i class="fa-solid fa-user-tie mr-1"></i> {{ stat }}
                         {% else %}
                             <i class="fa-solid fa-ghost mr-1"></i> Direct / No Parent
                         {% endif %}
                     </span>
-                    <div class="flex flex-col">
-                        <span class="text-xl font-bold text-emerald-400">{{ "{:,.0f}".format(stat.daily_total) }} <span class="text-[10px] font-normal text-slate-500">ل.س (قديمة)</span></span>
-                        <span class="text-lg font-bold text-blue-400">{{ "{:,.0f}".format(stat.daily_total / 100) }} <span class="text-[10px] font-normal text-slate-500">ل.س (جديدة)</span></span>
+                    <div class="flex flex-col space-y-2 w-full">
+                        <!-- Cash Row -->
+                        <div class="flex items-center justify-between border-b border-slate-700/50 pb-1">
+                            <span class="text-[10px] text-slate-500 font-bold">CASH</span>
+                            <div class="flex flex-col text-right">
+                                <span class="text-sm font-bold text-emerald-400">{{ "{:,.0f}".format(daily_stats[stat].get('Cash', 0)) }} <span class="text-[8px] font-normal text-slate-500">ل.س</span></span>
+                                <span class="text-[10px] font-bold text-blue-400">{{ "{:,.0f}".format(daily_stats[stat].get('Cash', 0) / 100) }} <span class="text-[8px] font-normal text-slate-500">ل.س</span></span>
+                            </div>
+                        </div>
+                        <!-- ShamCash Row -->
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] text-blue-400 font-bold italic">SHAM CASH</span>
+                            <div class="flex flex-col text-right">
+                                <span class="text-sm font-bold text-emerald-400">{{ "{:,.0f}".format(daily_stats[stat].get('ShamCash', 0)) }} <span class="text-[8px] font-normal text-slate-500">ل.س</span></span>
+                                <span class="text-[10px] font-bold text-blue-400">{{ "{:,.0f}".format(daily_stats[stat].get('ShamCash', 0) / 100) }} <span class="text-[8px] font-normal text-slate-500">ل.س</span></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
@@ -218,6 +232,40 @@
                         </div>
                     </div>
 
+                    <!-- Payment Method Selection -->
+                    <div class="bg-slate-800/40 p-3 rounded-lg border border-slate-700/50">
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">وسيلة الدفع (Payment Method)</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="relative flex items-center justify-center p-3 rounded-lg border border-slate-700 bg-slate-900 cursor-pointer hover:border-emerald-500/50 transition-all has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 group">
+                                <input type="radio" name="payment_method" value="Cash" checked class="hidden peer">
+                                <div class="flex flex-col items-center">
+                                    <i class="fa-solid fa-money-bill-1 text-slate-500 group-hover:text-emerald-400 peer-checked:text-emerald-500 mb-1 transition-colors"></i>
+                                    <span class="text-xs font-bold text-slate-400 peer-checked:text-emerald-500 transition-colors">كاش (Cash)</span>
+                                </div>
+                            </label>
+                            <label class="relative flex items-center justify-center p-3 rounded-lg border border-slate-700 bg-slate-900 cursor-pointer hover:border-blue-500/50 transition-all has-[:checked]:border-blue-500 has-[:checked]:bg-blue-500/10 group">
+                                <input type="radio" name="payment_method" value="ShamCash" class="hidden peer">
+                                <div class="flex flex-col items-center">
+                                    <i class="fa-solid fa-mobile-screen-button text-slate-500 group-hover:text-blue-400 peer-checked:text-blue-500 mb-1 transition-colors"></i>
+                                    <span class="text-xs font-bold text-slate-400 peer-checked:text-blue-500 transition-colors">شام كاش</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Receipt Number (Hidden by default, shown for ShamCash) -->
+                    <div id="receipt_container" class="hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                        <label for="receipt_number" class="block text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">رقم الإيصال (Receipt Number)</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-blue-500">
+                                <i class="fa-solid fa-receipt"></i>
+                            </div>
+                            <input type="text" id="receipt_number" name="receipt_number"
+                                class="w-full bg-slate-900 border border-blue-500/30 rounded-lg pl-10 pr-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all placeholder-slate-600"
+                                placeholder="Enter receipt number">
+                        </div>
+                    </div>
+
                     <button type="submit"
                         class="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold rounded-lg shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-emerald-500 transition-all duration-300">
                         <i class="fa-solid fa-plus mr-1"></i> Register Payment (Enter)
@@ -261,6 +309,7 @@
                                 <th scope="col" class="px-4 py-4 font-semibold tracking-wider w-2 hidden sm:table-cell">ID</th>
                                 <th scope="col" class="px-4 py-4 font-semibold tracking-wider">User Details</th>
                                 <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-right">Amount</th>
+                                <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-center">Method</th>
                                 <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-center">Status</th>
                                 <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-left pl-6 hidden md:table-cell">Admin / Date</th>
                                 <th scope="col" class="px-4 py-4 font-semibold tracking-wider text-center w-10">Actions</th>
@@ -290,6 +339,18 @@
                                         </div>
                                     </td>
                                     <td class="px-4 py-4 whitespace-nowrap text-center align-top pt-5">
+                                        {% if payment.payment_method == 'ShamCash' %}
+                                            <div class="flex flex-col items-center gap-1">
+                                                <span class="bg-blue-500/10 text-blue-400 text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-500/20 italic">ShamCash</span>
+                                                {% if payment.receipt_number %}
+                                                    <span class="text-[8px] text-slate-500 font-mono">#{{ payment.receipt_number }}</span>
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            <span class="bg-slate-700/30 text-slate-400 text-[9px] font-bold px-1.5 py-0.5 rounded border border-slate-700">Cash</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-center align-top pt-5">
                                         {% if payment.amount > 0 %}
                                             <i class="fa-solid fa-check-circle text-emerald-500 text-xs" title="Paid"></i>
                                         {% else %}
@@ -304,6 +365,11 @@
                                     </td>
                                     <td class="px-4 py-4 whitespace-nowrap text-center align-top pt-5">
                                         <div class="flex items-center justify-center gap-1.5 transition-opacity">
+                                            {% if payment.payment_method == 'ShamCash' %}
+                                            <button onclick="alert('Receipt ID: {{ payment.receipt_number if payment.receipt_number else 'N/A' }}')" class="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-colors" title="View ShamCash Receipt">
+                                                <i class="fa-solid fa-receipt text-[9px]"></i>
+                                            </button>
+                                            {% endif %}
                                             <button data-id="{{ payment.id }}" data-amount="{{ payment.amount }}" onclick="openEditModal(this.dataset.id, this.dataset.amount)" class="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-colors" title="Edit">
                                                 <i class="fa-solid fa-pen text-[9px]"></i>
                                             </button>
@@ -445,6 +511,25 @@
             }
         };
         const tom = new TomSelect('#user_select', settings);
+        
+        // Toggle Receipt Number field visibility
+        const paymentMethodRadios = document.querySelectorAll('input[name="payment_method"]');
+        const receiptContainer = document.getElementById('receipt_container');
+        const receiptInput = document.getElementById('receipt_number');
+
+        paymentMethodRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'ShamCash') {
+                    receiptContainer.classList.remove('hidden');
+                    receiptInput.required = true;
+                    receiptInput.focus();
+                } else {
+                    receiptContainer.classList.add('hidden');
+                    receiptInput.required = false;
+                    receiptInput.value = '';
+                }
+            });
+        });
         
         window.lookupUserInSas = function() {
             const username = document.getElementById('hidden_username').value;

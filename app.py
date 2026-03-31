@@ -109,12 +109,26 @@ def init_db():
             profile_name TEXT,
             parent TEXT,
             amount REAL NOT NULL,
+            payment_method TEXT DEFAULT 'Cash',
+            receipt_number TEXT,
             admin_name TEXT NOT NULL,
             phone TEXT, 
             public_token TEXT UNIQUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    # Migration: Ensure payment_method and receipt_number columns exist
+    c.execute("PRAGMA table_info(payments_v3)")
+    cols = [row[1] for row in c.fetchall()]
+    if 'payment_method' not in cols:
+        c.execute("ALTER TABLE payments_v3 ADD COLUMN payment_method TEXT DEFAULT 'Cash'")
+    if 'receipt_number' not in cols:
+        c.execute("ALTER TABLE payments_v3 ADD COLUMN receipt_number TEXT")
+    if 'phone' not in cols:
+        c.execute("ALTER TABLE payments_v3 ADD COLUMN phone TEXT")
+    if 'admin_name' not in cols:
+        c.execute("ALTER TABLE payments_v3 ADD COLUMN admin_name TEXT NOT NULL DEFAULT 'Unknown'")
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS installations (
@@ -1041,6 +1055,8 @@ def payments():
         parent = request.form.get('parent', '')
         amount = request.form.get('amount')
         phone = request.form.get('phone', '') # Added phone
+        payment_method = request.form.get('payment_method', 'Cash')
+        receipt_number = request.form.get('receipt_number', '') if payment_method == 'ShamCash' else None
         admin_name = session.get('username', 'Unknown')
         
         if username and amount:
@@ -1049,9 +1065,9 @@ def payments():
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO payments_v3 
-                (username, fullname, profile_name, parent, amount, admin_name, phone, public_token) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (username, fullname, profile_name, parent, amount, admin_name, phone, public_token))
+                (username, fullname, profile_name, parent, amount, admin_name, phone, payment_method, receipt_number, public_token) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (username, fullname, profile_name, parent, amount, admin_name, phone, payment_method, receipt_number, public_token))
             payment_id = cursor.lastrowid
             conn.commit()
             conn.close()
@@ -1065,11 +1081,13 @@ def payments():
                 'parent': parent,
                 'amount': amount,
                 'phone': phone,
+                'payment_method': payment_method,
+                'receipt_number': receipt_number,
                 'admin_name': admin_name,
                 'public_token': public_token
             }, webhook_type='payments', event_name='new', base_url=request.host_url)
             
-            flash(f'Successfully registered payment of {amount} ل.س for {username}.', 'success')
+            flash(f'Successfully registered {payment_method} payment of {amount} ل.س for {username}.', 'success')
             return redirect(url_for('payments'))
             
     token = session['token']
@@ -1128,20 +1146,31 @@ def payments():
     recent_payments = conn.execute(base_query, params).fetchall()
     
     # Daily Stats Query with Visibility Restriction
-    stats_params = []
-    stats_where = "WHERE date(created_at) = date('now')"
+    stats_params = [datetime.now().strftime('%Y-%m-%d')]
+    stats_where = "WHERE date(created_at) = ?"
     if user_role == 'employee':
         stats_where += " AND admin_name = ?"
         stats_params.append(user_name)
-
+    
     today_totals_query = f'''
-        SELECT parent, SUM(amount) as daily_total 
+        SELECT parent, payment_method, SUM(amount) as daily_total 
         FROM payments_v3 
         {stats_where}
-        GROUP BY parent
+        GROUP BY parent, payment_method
         ORDER BY daily_total DESC
     '''
-    daily_stats = conn.execute(today_totals_query, stats_params).fetchall()
+    daily_stats_raw = conn.execute(today_totals_query, stats_params).fetchall()
+    
+    # Process stats for UI (Cash vs ShamCash)
+    daily_stats = {}
+    for row in daily_stats_raw:
+        parent = row['parent']
+        method = row['payment_method']
+        total = row['daily_total']
+        if parent not in daily_stats:
+            daily_stats[parent] = {'Cash': 0, 'ShamCash': 0}
+        daily_stats[parent][method] = total
+
     conn.close()
 
     current_date = datetime.now().strftime('%Y-%m-%d')
@@ -1213,7 +1242,7 @@ def export_payments():
 
     if user_role == 'employee':
         query = '''
-            SELECT id, username, fullname, phone, profile_name, parent, amount, admin_name, created_at 
+            SELECT id, username, fullname, phone, profile_name, parent, amount, payment_method, admin_name, created_at 
             FROM payments_v3 
             WHERE date(created_at) BETWEEN ? AND ? AND admin_name = ?
             ORDER BY created_at DESC
@@ -1221,7 +1250,7 @@ def export_payments():
         payments_data = conn.execute(query, (start_date, end_date, user_name)).fetchall()
     else:
         query = '''
-            SELECT id, username, fullname, phone, profile_name, parent, amount, admin_name, created_at 
+            SELECT id, username, fullname, phone, profile_name, parent, amount, payment_method, receipt_number, admin_name, created_at 
             FROM payments_v3 
             WHERE date(created_at) BETWEEN ? AND ? 
             ORDER BY created_at DESC
@@ -1231,10 +1260,10 @@ def export_payments():
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['ID', 'Username', 'Full Name', 'Phone', 'Profile / Speed', 'Parent', 'Amount (SYP)', 'Admin', 'Date Registered'])
+    writer.writerow(['ID', 'Username', 'Full Name', 'Phone', 'Profile / Speed', 'Parent', 'Amount (SYP)', 'Payment Method', 'Receipt No', 'Admin', 'Date Registered'])
     
     for p in payments_data:
-        writer.writerow([p['id'], p['username'], p['fullname'], p['phone'], p['profile_name'], p['parent'], p['amount'], p['admin_name'], p['created_at']])
+        writer.writerow([p['id'], p['username'], p['fullname'], p['phone'], p['profile_name'], p['parent'], p['amount'], p['payment_method'], p['receipt_number'] if 'receipt_number' in p.keys() else '', p['admin_name'], p['created_at']])
 
     csv_data = output.getvalue()
     csv_data_with_bom = '\ufeff' + csv_data
@@ -1860,11 +1889,17 @@ def report():
 
     conn = get_db_connection()
 
-    # Total subscriber payments in range
-    subscriber_income = conn.execute(
-        "SELECT COALESCE(SUM(amount),0) as total FROM payments_v3 WHERE date(created_at) BETWEEN ? AND ?",
+    # Total subscriber payments in range (Cash vs ShamCash)
+    subscriber_income_raw = conn.execute(
+        "SELECT payment_method, COALESCE(SUM(amount),0) as total FROM payments_v3 WHERE date(created_at) BETWEEN ? AND ? GROUP BY payment_method",
         (start_date, end_date)
-    ).fetchone()['total']
+    ).fetchall()
+    
+    income_method_breakdown = {'Cash': 0, 'ShamCash': 0}
+    for row in subscriber_income_raw:
+        income_method_breakdown[row['payment_method']] = row['total']
+    
+    subscriber_income = sum(income_method_breakdown.values())
 
     # Total installations income in range (USD/SYP)
     inst_revenue = conn.execute("""
@@ -1971,6 +2006,7 @@ def report():
         daily_rows=daily_rows,
         expense_by_category=expense_by_category,
         income_by_profile=income_by_profile,
+        income_method_breakdown=income_method_breakdown,
         sub_percent=sub_percent,
         inst_percent=inst_percent,
         api_status=api_status,

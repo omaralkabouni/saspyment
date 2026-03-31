@@ -173,6 +173,16 @@
                 <span class="label">نوع الشحن:</span>
                 <span class="value">{{ p.profile_name }}</span>
             </div>
+            <div class="info-row">
+                <span class="label">وسيلة الدفع:</span>
+                <span class="value">{{ 'كاش' if p.payment_method == 'Cash' else 'شام كاش' }}</span>
+            </div>
+            {% if p.payment_method == 'ShamCash' and p.receipt_number %}
+            <div class="info-row">
+                <span class="label">رقم الإيصال:</span>
+                <span class="value">{{ p.receipt_number }}</span>
+            </div>
+            {% endif %}
         </div>
 
         <div class="subscriber-details">
