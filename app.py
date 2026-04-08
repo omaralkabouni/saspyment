@@ -148,6 +148,11 @@ def init_db():
             dish_ip TEXT,
             payment_amount_usd REAL DEFAULT 0,
             payment_amount_syp REAL DEFAULT 0,
+            is_verified INTEGER DEFAULT 0,
+            verified_by TEXT,
+            verified_at TIMESTAMP,
+            verification_notes TEXT,
+            recipient_name TEXT,
             public_token TEXT UNIQUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -331,7 +336,12 @@ def init_db():
         ("installations", "public_token", "TEXT"),
         ("installations", "parent", "TEXT"),
         ("installations", "payment_amount_usd", "REAL DEFAULT 0"),
-        ("installations", "payment_amount_syp", "REAL DEFAULT 0")
+        ("installations", "payment_amount_syp", "REAL DEFAULT 0"),
+        ("installations", "is_verified", "INTEGER DEFAULT 0"),
+        ("installations", "verified_by", "TEXT"),
+        ("installations", "verified_at", "TIMESTAMP"),
+        ("installations", "verification_notes", "TEXT"),
+        ("installations", "recipient_name", "TEXT")
     ]
 
     for table, column, col_type in migrations:
@@ -2782,6 +2792,26 @@ def installations():
             else:
                 flash('🚫 غير مصرح.', 'error')
                 
+        elif action == 'edit_verified' and user_role in ['admin', 'manager']:
+            inst_id = request.form.get('inst_id')
+            password = request.form.get('password')
+            
+            if password == get_or_create_delete_password():
+                payment_amount_usd = request.form.get('payment_amount_usd', 0)
+                payment_amount_syp = request.form.get('payment_amount_syp', 0)
+                verification_notes = request.form.get('verification_notes', '')
+                recipient_name = session.get('username')
+                
+                conn.execute('''
+                    UPDATE installations 
+                    SET payment_amount_usd = ?, payment_amount_syp = ?, verification_notes = ?, recipient_name = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (payment_amount_usd, payment_amount_syp, verification_notes, recipient_name, inst_id))
+                conn.commit()
+                flash('✅ تم تحديث بيانات التركيب المعتمدة بنجاح.', 'success')
+            else:
+                flash('❌ كلمة المرور غير صحيحة. لا يمكن التعديل.', 'error')
+
         return redirect(url_for('installations'))
 
     # Filtering
@@ -2834,6 +2864,81 @@ def installations():
     conn.close()
     return render_template('installations.html', installations=all_installations, maintenance_users=maintenance_users, stats=stats, exchange_rate=exchange_rate)
 
+@app.route('/installations/report')
+def installations_report():
+    if 'token' not in session: return redirect(url_for('login'))
+    user_role = session.get('role')
+    if user_role not in ['admin', 'manager']:
+        flash('🚫 Unauthorized.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+
+    query = 'SELECT * FROM installations WHERE status = "Completed"'
+    where = []
+    params = []
+
+    if start_date:
+        where.append("DATE(created_at) >= ?")
+        params.append(start_date)
+    if end_date:
+        where.append("DATE(created_at) <= ?")
+        params.append(end_date)
+
+    if where:
+        query += ' AND ' + ' AND '.join(where)
+    query += ' ORDER BY created_at DESC'
+    
+    def safe_float(val):
+        try:
+            if val is None or str(val).strip() == '': return 0.0
+            return float(val)
+        except:
+            return 0.0
+            
+    conn = get_db_connection()
+    rows = conn.execute(query, params).fetchall()
+    data = [dict(row) for row in rows]
+    
+    stats = {
+        'total': len(data),
+        'dishes': sum(1 for r in data if r.get('connection_type') == 'Dish'),
+        'boxes': sum(1 for r in data if r.get('connection_type') == 'Box'),
+        'total_usd': sum(safe_float(r.get('payment_amount_usd')) for r in data),
+        'total_syp': sum(safe_float(r.get('payment_amount_syp')) for r in data)
+    }
+
+    # Employee Breakdown Logic
+    emp_map = {}
+    for r in data:
+        emp = r.get('assigned_to') or 'غير مكلف'
+        if emp not in emp_map:
+            emp_map[emp] = {'total': 0, 'dishes': 0, 'boxes': 0, 'usd': 0.0, 'syp': 0.0}
+        
+        emp_map[emp]['total'] += 1
+        if r.get('connection_type') == 'Dish': emp_map[emp]['dishes'] += 1
+        elif r.get('connection_type') == 'Box': emp_map[emp]['boxes'] += 1
+        
+        emp_map[emp]['usd'] += safe_float(r.get('payment_amount_usd'))
+        emp_map[emp]['syp'] += safe_float(r.get('payment_amount_syp'))
+        
+        # Ensure rows have valid data for template
+        r['payment_amount_usd'] = safe_float(r.get('payment_amount_usd'))
+        r['payment_amount_syp'] = safe_float(r.get('payment_amount_syp'))
+
+    employee_stats = []
+    for name, s in emp_map.items():
+        employee_stats.append({
+            'name': name,
+            **s
+        })
+    # Sort by total count descending
+    employee_stats.sort(key=lambda x: x['total'], reverse=True)
+
+    conn.close()
+    return render_template('installations_report.html', installations=data, stats=stats, employee_stats=employee_stats, start_date=start_date, end_date=end_date)
+
 @app.route('/installations/export')
 def export_installations():
     if 'token' not in session: return redirect(url_for('login'))
@@ -2851,6 +2956,95 @@ def export_installations():
     csv_data = '\ufeff' + output.getvalue()
     filename = f"installations_{datetime.now().strftime('%Y-%m-%d')}.csv"
     return Response(csv_data, mimetype='text/csv', headers={'Content-Disposition': f'attachment;filename={filename}'})
+    
+@app.route('/installations/verify/<int:id>', methods=['POST'])
+def verify_installation(id):
+    if 'token' not in session: return redirect(url_for('login'))
+    if session.get('role') not in ['admin', 'manager']:
+        flash('🚫 غير مصرح.', 'error')
+        return redirect(url_for('installations'))
+        
+    payment_usd = request.form.get('payment_amount_usd', 0)
+    payment_syp = request.form.get('payment_amount_syp', 0)
+    try:
+        payment_usd = float(payment_usd) if payment_usd else 0.0
+        payment_syp = float(payment_syp) if payment_syp else 0.0
+    except ValueError:
+        payment_usd = 0.0
+        payment_syp = 0.0
+
+    notes = request.form.get('verification_notes', '')
+    recipient_name = session.get('username')
+    
+    conn = get_db_connection()
+    conn.execute('''
+        UPDATE installations 
+        SET is_verified = 1, 
+            verified_by = ?, 
+            verified_at = CURRENT_TIMESTAMP,
+            payment_amount_usd = ?,
+            payment_amount_syp = ?,
+            verification_notes = ?,
+            recipient_name = ?
+        WHERE id = ?
+    ''', (session.get('username'), payment_usd, payment_syp, notes, recipient_name, id))
+    conn.commit()
+    conn.close()
+    
+    flash('✅ تم التحقق من البيانات والاعتماد بنجاح.', 'success')
+    return redirect(url_for('installations'))
+
+@app.route('/installations/print/<int:id>')
+def print_installation(id):
+    if 'token' not in session: return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    inst = conn.execute('SELECT * FROM installations WHERE id = ?', (id,)).fetchone()
+    
+    if not inst:
+        conn.close()
+        return "Installation not found.", 404
+        
+    if session.get('role') == 'maintenance' and not inst['is_verified']:
+        conn.close()
+        flash('🚫 لا يمكن طباعة الفاتورة قبل اعتمادها من المدير.', 'error')
+        return redirect(url_for('installations'))
+        
+    items_used = conn.execute('''
+        SELECT s.*, i.name 
+        FROM inventory_sales s
+        JOIN inventory_items i ON s.item_id = i.id
+        WHERE s.installation_id = ?
+    ''', (id,)).fetchall()
+    
+    conn.close()
+    return render_template('print_installation.html', inst=inst, items=items_used)
+
+@app.route('/installations/print_small/<int:id>')
+def print_installation_small(id):
+    if 'token' not in session: return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    inst = conn.execute('SELECT * FROM installations WHERE id = ?', (id,)).fetchone()
+    
+    if not inst:
+        conn.close()
+        return "Installation not found.", 404
+        
+    if session.get('role') == 'maintenance' and not inst['is_verified']:
+        conn.close()
+        flash('🚫 لا يمكن طباعة الفاتورة قبل اعتمادها من المدير.', 'error')
+        return redirect(url_for('installations'))
+        
+    items_used = conn.execute('''
+        SELECT s.*, i.name 
+        FROM inventory_sales s
+        JOIN inventory_items i ON s.item_id = i.id
+        WHERE s.installation_id = ?
+    ''', (id,)).fetchall()
+    
+    conn.close()
+    return render_template('print_installation_small.html', inst=inst, items=items_used)
 
 
 

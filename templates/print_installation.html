@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فاتورة تركيب - {{ inst.fullname }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #64748b;
+            --accent: #f59e0b;
+            --success: #10b981;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --bg-light: #f8fafc;
+        }
+
+        body {
+            font-family: 'Tajawal', sans-serif;
+            margin: 0;
+            padding: 40px;
+            color: var(--text-main);
+            background: white;
+            line-height: 1.6;
+        }
+
+        @media print {
+            body { padding: 0; }
+            .no-print { display: none; }
+            .invoice-card { box-shadow: none !important; border: 1px solid var(--border) !important; }
+        }
+
+        .invoice-card {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .company-info h1 {
+            margin: 0;
+            color: var(--primary);
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .company-info p {
+            margin: 5px 0;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .invoice-title {
+            text-align: left;
+        }
+
+        .invoice-title h2 {
+            margin: 0;
+            font-size: 22px;
+            color: var(--text-main);
+        }
+
+        .invoice-title p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 5px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .info-label {
+            color: var(--text-muted);
+        }
+
+        .info-value {
+            font-weight: 500;
+        }
+
+        .table-container {
+            margin-bottom: 40px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: var(--bg-light);
+            text-align: right;
+            padding: 12px;
+            font-size: 14px;
+            color: var(--primary);
+            border-bottom: 2px solid var(--border);
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        .total-section {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            margin-top: 20px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            width: 250px;
+            margin-bottom: 5px;
+        }
+
+        .total-row.final {
+            border-top: 2px solid var(--primary);
+            margin-top: 10px;
+            padding-top: 10px;
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--primary);
+        }
+
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-top: 1px dashed var(--border);
+            padding-top: 20px;
+        }
+
+        .verification-stamp {
+            margin-top: 30px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .stamp {
+            border: 3px solid var(--success);
+            color: var(--success);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            transform: rotate(-10deg);
+            text-transform: uppercase;
+        }
+
+        .no-print-actions {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: 0.3s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-secondary { background: var(--secondary); color: white; }
+
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+
+    <div class="invoice-card">
+        <div class="header">
+            <div class="company-info">
+                <h1>شركة توب نت (TopNet)</h1>
+                <p>إدارة شبكات اللاسلكي والحلول المتكاملة</p>
+                <p>هاتف: 09XXXXXXXX | البريد: support@topnet.sy</p>
+            </div>
+            <div class="invoice-title">
+                <h2>فاتورة تركيب #{{ inst.id }}</h2>
+                <p>تاريخ الطلب: {{ inst.created_at }}</p>
+                <p>تاريخ الإنجاز: {{ inst.updated_at }}</p>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="patient-info">
+                <div class="section-title">بيانات المشترك</div>
+                <div class="info-row">
+                    <span class="info-label">المشترك:</span>
+                    <span class="info-value">{{ inst.fullname }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">اسم المستلم:</span>
+                    <span class="info-value">{{ inst.recipient_name or inst.fullname }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">رقم الهاتف:</span>
+                    <span class="info-value">{{ inst.phone1 }} / {{ inst.phone2 or '-' }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">المنطقة:</span>
+                    <span class="info-value">{{ inst.area }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">العنوان:</span>
+                    <span class="info-value">{{ inst.address_details }}</span>
+                </div>
+            </div>
+
+            <div class="technical-info">
+                <div class="section-title">البيانات التقنية</div>
+                <div class="info-row">
+                    <span class="info-label">نوع الاتصال:</span>
+                    <span class="info-value">{{ inst.connection_type }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">IP الصحن:</span>
+                    <span class="info-value">{{ inst.dish_ip }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">الفني المسؤول:</span>
+                    <span class="info-value">{{ inst.assigned_to }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">حالة التحقق:</span>
+                    <span class="info-value" style="color: var(--success)">{% if inst.is_verified %}تم التدقيق والاعتماد{% else %}قيد التدقيق{% endif %}</span>
+                </div>
+            </div>
+        </div>
+
+        {% if items %}
+        <div class="table-container">
+            <div class="section-title">المواد والمعدات المستهلكة</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>المادة</th>
+                        <th>الكمية</th>
+                        <th>السعر الإفرادي</th>
+                        <th>الإجمالي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>{{ "{:,.2f}".format(item.sell_price) }}</td>
+                        <td>{{ "{:,.2f}".format(item.total_amount) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <div class="total-section">
+            <div class="section-title" style="width: 250px; text-align: left;">الملخص المالي</div>
+            <div class="total-row">
+                <span class="info-label">المبلغ المطلوب (USD):</span>
+                <span class="info-value">${{ "{:,.2f}".format(inst.payment_amount_usd) }}</span>
+            </div>
+            <div class="total-row final">
+                <span class="info-label">المبالغ المدفوعة (SYP):</span>
+                <span class="info-value">{{ "{:,.0f}".format(inst.payment_amount_syp) }} ل.س</span>
+            </div>
+        </div>
+
+        {% if inst.is_verified %}
+        <div class="verification-stamp">
+            <div class="stamp">
+                معتمد من: {{ inst.verified_by }}
+                <br>
+                بتاريخ: {{ inst.verified_at[:10] }}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="footer">
+            <p>تعتبر هذه الفاتورة مستند رسمي لإتمام عملية التركيب والبرمجة من قبل شركة توب نت.</p>
+            <p>شكراً لثقتكم بنا.</p>
+        </div>
+    </div>
+
+    <div class="no-print no-print-actions">
+        <button onclick="window.print()" class="btn btn-primary">
+            <span>🖨️ طباعة الفاتورة</span>
+        </button>
+        <a href="{{ url_for('installations') }}" class="btn btn-secondary">
+            <span>🔙 العودة للوحة التحكم</span>
+        </a>
+    </div>
+
+</body>
+</html>

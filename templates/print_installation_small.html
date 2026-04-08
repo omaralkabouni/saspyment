@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>فاتورة #{{ inst.id }}</title>
+    <style>
+        @page { size: 73mm auto; margin: 0; }
+        body {
+            font-family: Arial, sans-serif;
+            width: 73mm;
+            margin: 0;
+            padding: 5mm;
+            font-size: 12px;
+            color: #000;
+        }
+        .text-center { text-align: center; }
+        .header { border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 10px; }
+        .company-name { font-size: 16px; font-weight: bold; margin: 0; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+        .info-label { font-weight: bold; }
+        .divider { border-top: 1px dashed #000; margin: 10px 0; }
+        .total-box { background: #f0f0f0; padding: 5px; border-radius: 4px; border: 1px solid #000; }
+        .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; }
+        .footer { font-size: 10px; margin-top: 15px; }
+        .item-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 5px; }
+        .item-table th { border-bottom: 1px solid #000; text-align: right; }
+    </style>
+</head>
+<body onload="window.print()">
+
+    <div class="header text-center">
+        <h1 class="company-name">شركة توب نت (TopNet)</h1>
+        <p style="margin:2px 0;">فاتورة تركيب #{{ inst.id }}</p>
+    </div>
+
+    <div class="customer-info">
+        <div class="info-row">
+            <span class="info-label">المشترك:</span>
+            <span>{{ inst.fullname }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">المستلم:</span>
+            <span>{{ inst.recipient_name or inst.fullname }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">التاريخ:</span>
+            <span>{{ inst.updated_at[:10] }}</span>
+        </div>
+    </div>
+
+    {% if items %}
+    <table class="item-table">
+        <thead>
+            <tr>
+                <th>المادة</th>
+                <th>كمية</th>
+                <th>إجمالي</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ "{:,.0f}".format(item.total_amount) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <div class="divider"></div>
+
+    <div class="total-box">
+        <div class="total-row" style="margin-bottom: 5px;">
+            <span>المبلغ ($):</span>
+            <span>${{ "{:,.2f}".format(inst.payment_amount_usd) }}</span>
+        </div>
+        <div class="total-row">
+            <span>المدفوع (ل.س):</span>
+            <span>{{ "{:,.0f}".format(inst.payment_amount_syp) }}</span>
+        </div>
+    </div>
+
+    <div class="footer text-center">
+        <p>التوقيع: ..........................</p>
+        <p>شكراً لتعاملكم معنا</p>
+        <p style="font-weight: bold;">معتمد من: {{ inst.verified_by }}</p>
+    </div>
+
+</body>
+</html>

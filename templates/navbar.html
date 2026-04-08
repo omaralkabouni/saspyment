@@ -52,6 +52,10 @@
                                 <i class="fa-solid fa-chart-pie w-4 opacity-70"></i> 
                                 {% if session.get('lang', 'ar') == 'ar' %}التقارير المالية{% else %}Financial Reports{% endif %}
                             </a>
+                            <a href="{{ url_for('installations_report') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-emerald-600/10 hover:text-emerald-400 transition-colors">
+                                <i class="fa-solid fa-chart-column w-4 opacity-70"></i> 
+                                {% if session.get('lang', 'ar') == 'ar' %}تقرير التركيبات{% else %}Installation Reports{% endif %}
+                            </a>
                             <a href="{{ url_for('change_password') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors">
                                 <i class="fa-solid fa-key w-4 opacity-70"></i> 
                                 {% if session.get('lang', 'ar') == 'ar' %}تغيير كلمة المرور{% else %}Change Password{% endif %}
@@ -188,6 +192,9 @@
             {% if session.get('role') in ['admin', 'manager'] %}
             <a href="{{ url_for('report') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('report') %}bg-blue-600/10 text-blue-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
                 <i class="fa-solid fa-chart-pie w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}التقرير المالي{% else %}Financial Report{% endif %}
+            </a>
+            <a href="{{ url_for('installations_report') }}" class="block px-3 py-4 rounded-md text-base font-medium {% if request.path == url_for('installations_report') %}bg-emerald-600/10 text-emerald-400{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+                <i class="fa-solid fa-chart-column w-6"></i> {% if session.get('lang', 'ar') == 'ar' %}تقرير التركيبات{% else %}Installation Report{% endif %}
             </a>
             {% endif %}
             {% if session.get('role') == 'admin' %}
